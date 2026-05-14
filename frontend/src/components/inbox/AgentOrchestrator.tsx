@@ -232,8 +232,8 @@ export default function AgentOrchestrator({
                       disabled={saveStateMut.isPending}
                       className="flex-1 px-2 py-1.5 text-[11px] font-medium flex items-center justify-center gap-1 transition-all"
                       style={{
-                        background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                        color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
+                        background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(37, 99, 235,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                        color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#2563EB" : "hsl(240 15% 80%)") : "var(--text-3)",
                       }}>
                       <Icon className="h-3 w-3" />
                       {label}
@@ -269,7 +269,7 @@ export default function AgentOrchestrator({
                     onClick={handleSaveContext}
                     disabled={saveStateMut.isPending}
                     className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-all"
-                    style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}
+                    style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)", color: "#2563EB" }}
                   >
                     {saveStateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                     Salvar
@@ -305,8 +305,8 @@ export default function AgentOrchestrator({
                       <div
                         className="max-w-[90%] rounded-xl px-3 py-2 text-xs"
                         style={{
-                          background: msg.role === "operator" ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
-                          border: `1px solid ${msg.role === "operator" ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+                          background: msg.role === "operator" ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
+                          border: `1px solid ${msg.role === "operator" ? "rgba(37, 99, 235,0.20)" : "var(--surface-border)"}`,
                           color: "var(--text-1)",
                         }}
                       >
@@ -316,7 +316,7 @@ export default function AgentOrchestrator({
                             {msg.tools.map((t, i) => (
                               <div key={i} className="flex items-center gap-1.5 text-[10px]">
                                 <span className={`w-1.5 h-1.5 rounded-full ${t.ok ? "bg-emerald-500" : "bg-red-500"}`} />
-                                <span style={{ color: t.ok ? "#00d46a" : "#ef4444" }}>
+                                <span style={{ color: t.ok ? "#2563EB" : "#ef4444" }}>
                                   {t.tool}: {t.detail}
                                 </span>
                               </div>

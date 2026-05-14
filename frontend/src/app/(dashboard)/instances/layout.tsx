@@ -10,9 +10,9 @@ export default function InstancesLayout({ children }: { children: React.ReactNod
         icon={Smartphone}
         title="Instâncias"
         subtitle="Conexões com WhatsApp, Instagram, Telegram"
-        color="#00d46a"
-        bg="rgba(0,212,106,0.10)"
-        border="rgba(0,212,106,0.25)"
+        color="#2563EB"
+        bg="rgba(37, 99, 235,0.10)"
+        border="rgba(37, 99, 235,0.25)"
       />
       <div className="flex-1 min-h-0">{children}</div>
     </div>

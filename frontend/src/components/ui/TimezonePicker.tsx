@@ -163,7 +163,7 @@ export function TimezonePicker({
                 onClick={() => select(c)}
                 className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
                 style={{
-                  background: highlight === i ? "rgba(0,212,106,0.08)" : "transparent",
+                  background: highlight === i ? "rgba(37, 99, 235,0.08)" : "transparent",
                   borderBottom: i < results.length - 1 ? "1px solid var(--input)" : undefined,
                 }}
               >

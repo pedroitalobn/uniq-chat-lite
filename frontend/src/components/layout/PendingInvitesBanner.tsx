@@ -1,7 +1,7 @@
 "use client";
 
 // PendingInvitesBanner — alerta in-app pra users que já tinham conta na
-// Uniq quando alguém os convida pra outro workspace. Antes o convite só
+//  Qchat quando alguém os convida pra outro workspace. Antes o convite só
 // chegava por email; se o user não abrisse o email não tinha como saber.
 // Polling leve (30s + refetchOnFocus) cobre o caso "convite criado em
 // outra sessão" sem precisar de WebSocket.
@@ -56,15 +56,15 @@ export function PendingInvitesBanner() {
           key={inv.token}
           className="rounded-xl p-3 sm:p-4 flex items-center gap-3 flex-wrap"
           style={{
-            background: "rgba(0,212,106,0.06)",
-            border: "1px solid rgba(0,212,106,0.2)",
+            background: "rgba(37, 99, 235,0.06)",
+            border: "1px solid rgba(37, 99, 235,0.2)",
           }}
         >
           <span
             className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "rgba(0,212,106,0.12)" }}
+            style={{ background: "rgba(37, 99, 235,0.12)" }}
           >
-            <Building2 className="w-4 h-4" style={{ color: "#00d46a" }} />
+            <Building2 className="w-4 h-4" style={{ color: "#2563EB" }} />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
@@ -80,7 +80,7 @@ export function PendingInvitesBanner() {
               onClick={() => acceptMut.mutate(inv.token)}
               disabled={acceptMut.isPending}
               className="text-xs font-medium px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
-              style={{ background: "#00d46a", color: "#0a0a0f" }}
+              style={{ background: "#2563EB", color: "#0a0a0f" }}
             >
               {acceptMut.isPending && acceptMut.variables === inv.token ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

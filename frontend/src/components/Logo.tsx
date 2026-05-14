@@ -6,7 +6,7 @@ interface LogoProps {
   height?: number;
 }
 
-const GREEN = "#00d46a";
+const GREEN = "#2563EB";
 
 // Rounded-rect loop centered at origin, W=12, H=13.5, R=4.5
 // Each loop is a "frame" — same shape, rotated 120° for each copy
@@ -42,7 +42,7 @@ export function Logo({ className, height = 32 }: LogoProps) {
         width={height}
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0 dark:[filter:drop-shadow(0_0_8px_rgba(0,212,106,0.5))]"
+        className="shrink-0 dark:[filter:drop-shadow(0_0_8px_rgba(37, 99, 235,0.5))]"
         aria-hidden="true"
       >
         <defs>

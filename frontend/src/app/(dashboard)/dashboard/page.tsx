@@ -97,25 +97,25 @@ function BentoCard({
       className={`relative overflow-hidden rounded-2xl h-full group ${className}`}
       style={{
         background: highlight
-          ? "linear-gradient(135deg, rgba(0,212,106,0.10) 0%, rgba(0,212,106,0.04) 100%)"
+          ? "linear-gradient(135deg, rgba(37, 99, 235,0.10) 0%, rgba(37, 99, 235,0.04) 100%)"
           : "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
         border: highlight
-          ? "1px solid rgba(0,212,106,0.25)"
+          ? "1px solid rgba(37, 99, 235,0.25)"
           : "1px solid var(--border-default)",
         boxShadow: "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
         transition: "border-color 0.2s, box-shadow 0.2s",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.borderColor = highlight
-          ? "rgba(0,212,106,0.4)"
+          ? "rgba(37, 99, 235,0.4)"
           : "var(--border-strong)";
         (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-default)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.borderColor = highlight
-          ? "rgba(0,212,106,0.25)"
+          ? "rgba(37, 99, 235,0.25)"
           : "var(--border-default)";
         (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)";
       }}
@@ -136,7 +136,7 @@ function BentoCard({
 
 // ─── Stat card (small) ───────────────────────────────────────────────────────
 const COLOR_MAP = {
-  green:  { icon: "#00d46a", glow: "rgba(0,212,106,0.15)",  bg: "rgba(0,212,106,0.10)" },
+  green:  { icon: "#2563EB", glow: "rgba(37, 99, 235,0.15)",  bg: "rgba(37, 99, 235,0.10)" },
   blue:   { icon: "#60a5fa", glow: "rgba(96,165,250,0.15)", bg: "rgba(96,165,250,0.10)" },
   amber:  { icon: "#fbbf24", glow: "rgba(251,191,36,0.15)", bg: "rgba(251,191,36,0.10)" },
   violet: { icon: "#a78bfa", glow: "rgba(167,139,250,0.15)",bg: "rgba(167,139,250,0.10)" },
@@ -187,7 +187,7 @@ function StatCard({
 // ─── Instance row ─────────────────────────────────────────────────────────────
 function InstanceRow({ inst }: { inst: Instance }) {
   const DOT: Record<string, string> = {
-    connected: "#00d46a", connecting: "#fbbf24", banned: "#ef4444", disconnected: "#64748b",
+    connected: "#2563EB", connecting: "#fbbf24", banned: "#ef4444", disconnected: "#64748b",
   };
   const dot = DOT[inst.status] ?? "#64748b";
   return (
@@ -347,7 +347,7 @@ export default function DashboardPage() {
           style={{
             position: "absolute", top: "8%", left: "12%",
             width: "500px", height: "500px", borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(0,212,106,0.055) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(37, 99, 235,0.055) 0%, transparent 70%)",
             filter: "blur(80px)",
           }}
           animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
@@ -382,7 +382,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-            style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}>
+            style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)", color: "var(--green)" }}>
             <LiveDot />
             Ao vivo
           </span>
@@ -451,8 +451,8 @@ export default function DashboardPage() {
               <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gConv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00d46a" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gJorn" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
@@ -462,7 +462,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#52526a", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="conversas" name="Conversas" stroke="#00d46a" strokeWidth={2} fill="url(#gConv)" dot={false} />
+                <Area type="monotone" dataKey="conversas" name="Conversas" stroke="#2563EB" strokeWidth={2} fill="url(#gConv)" dot={false} />
                 <Area type="monotone" dataKey="jornadas" name="Jornadas" stroke="#a78bfa" strokeWidth={2} fill="url(#gJorn)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
@@ -482,7 +482,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="space-y-0.5">
-              <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#00d46a" />
+              <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#2563EB" />
               <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={Clock} label="Pendentes" value={conv.pending ?? 0} color="#fbbf24" />
               <div className="h-px" style={{ background: "var(--input)" }} />
@@ -615,7 +615,7 @@ export default function DashboardPage() {
               <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={BarChart2} label="Taxa resolução"
                 value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
-                color="#00d46a" />
+                color="#2563EB" />
             </div>
           </BentoCard>
         </motion.div>
@@ -631,7 +631,7 @@ export default function DashboardPage() {
         <motion.div variants={itemVariants}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {[
-              { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", desc: "Crie via linguagem natural", color: "#00d46a" },
+              { href: "/uniq-ai", icon: Sparkles, label: "QChat AI", desc: "Crie via linguagem natural", color: "#2563EB" },
               { href: "/journeys", icon: Wand2, label: "Jornadas", desc: "Cadências automáticas", color: "#a78bfa" },
               { href: "/campaigns", icon: Megaphone, label: "Campanhas", desc: "Disparo em massa", color: "#fbbf24" },
               { href: "/crm/deals", icon: TrendingUp, label: "Pipeline", desc: "Deals e funil de vendas", color: "#60a5fa" },

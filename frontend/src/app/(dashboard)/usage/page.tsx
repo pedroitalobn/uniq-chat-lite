@@ -28,9 +28,9 @@ import {
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
 
 const CATEGORY_META: Record<string, { label: string; icon: any; color: string; bg: string; border: string }> = {
-  ai:      { label: "Uniq AI",   icon: Sparkles,       color: "#a78bfa", bg: "rgba(167,139,250,0.10)", border: "rgba(167,139,250,0.25)" },
-  voice:   { label: "Uniq Voice",icon: Mic2,           color: "#f59e0b", bg: "rgba(245,158,11,0.10)",  border: "rgba(245,158,11,0.25)" },
-  message: { label: "Mensagens", icon: MessageSquare,  color: "#00d46a", bg: "rgba(0,212,106,0.10)",   border: "rgba(0,212,106,0.25)" },
+  ai:      { label: "QChat AI",   icon: Sparkles,       color: "#a78bfa", bg: "rgba(167,139,250,0.10)", border: "rgba(167,139,250,0.25)" },
+  voice:   { label: "Qchat Voice",icon: Mic2,           color: "#f59e0b", bg: "rgba(245,158,11,0.10)",  border: "rgba(245,158,11,0.25)" },
+  message: { label: "Mensagens", icon: MessageSquare,  color: "#2563EB", bg: "rgba(37, 99, 235,0.10)",   border: "rgba(37, 99, 235,0.25)" },
 };
 
 export default function UsagePage() {
@@ -374,7 +374,7 @@ function OverageCard({
         </div>
         <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
           {isPayg
-            ? "No plano free você usa 100% pay-as-you-go — compre top-ups pra usar Uniq AI ou Voice."
+            ? "No plano free você usa 100% pay-as-you-go — compre top-ups pra usar QChat AI ou Voice."
             : allowed
               ? "Continuar consumindo e cobrar os créditos extras na próxima fatura. Recomendado pra quem não pode parar."
               : "Pausar consumo desse tipo até o próximo ciclo ou comprar top-up. Recomendado pra controlar gastos."}
@@ -439,8 +439,8 @@ function TimeseriesCard({ items }: { items: UsageTimeseriesPoint[] }) {
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="g-msg" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#00d46a" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#00d46a" stopOpacity={0} />
+                <stop offset="0%" stopColor="#2563EB" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#2563EB" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="var(--input)" vertical={false} />
@@ -452,7 +452,7 @@ function TimeseriesCard({ items }: { items: UsageTimeseriesPoint[] }) {
             />
             <Area type="monotone" dataKey="AI" stroke="#a78bfa" strokeWidth={2} fill="url(#g-ai)" />
             <Area type="monotone" dataKey="Voice" stroke="#f59e0b" strokeWidth={2} fill="url(#g-voice)" />
-            <Area type="monotone" dataKey="Mensagens" stroke="#00d46a" strokeWidth={2} fill="url(#g-msg)" />
+            <Area type="monotone" dataKey="Mensagens" stroke="#2563EB" strokeWidth={2} fill="url(#g-msg)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -492,7 +492,7 @@ function EventsCard({
               onClick={() => onCategoryChange(f.id)}
               className="text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors"
               style={category === f.id
-                ? { background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }
+                ? { background: "rgba(37, 99, 235,0.18)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.35)" }
                 : { background: "var(--surface-3)", color: "var(--text-2)", border: "1px solid var(--surface-border)" }
               }
             >
@@ -562,12 +562,12 @@ function BuyTopupCTA({ onClick }: { onClick: () => void }) {
     <div
       className="rounded-2xl p-4 flex items-center gap-3"
       style={{
-        background: "linear-gradient(135deg, rgba(0,212,106,0.08), rgba(167,139,250,0.06))",
-        border: "1px solid rgba(0,212,106,0.25)",
+        background: "linear-gradient(135deg, rgba(37, 99, 235,0.08), rgba(167,139,250,0.06))",
+        border: "1px solid rgba(37, 99, 235,0.25)",
       }}
     >
       <div className="p-2 rounded-lg"
-        style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.25)" }}>
+        style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.25)" }}>
         <Plus className="w-4 h-4" style={{ color: "var(--green)" }} />
       </div>
       <div className="flex-1 min-w-0">

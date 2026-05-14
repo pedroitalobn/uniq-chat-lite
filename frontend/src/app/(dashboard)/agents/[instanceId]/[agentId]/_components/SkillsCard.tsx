@@ -60,14 +60,14 @@ export function SkillsCard({ form, update }: Props) {
       <CollapsibleCard
         title="Habilidades & Ações"
         icon={Wand2}
-        accentColor="#00d46a"
+        accentColor="#2563EB"
         meta={
           <span
             className="text-[10px] px-2 py-0.5 rounded-full"
             style={{
-              background: "rgba(0,212,106,0.10)",
+              background: "rgba(37, 99, 235,0.10)",
               color: "var(--green)",
-              border: "1px solid rgba(0,212,106,0.20)",
+              border: "1px solid rgba(37, 99, 235,0.20)",
             }}
           >
             {enabled.length}/{ALL_ACTIONS.length} ativas

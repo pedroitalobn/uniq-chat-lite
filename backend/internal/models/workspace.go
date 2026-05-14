@@ -9,7 +9,7 @@ import (
 
 // Workspace representa um negócio/conta agrupando users, instâncias e
 // recursos. Color e Icon são personalização visual: Color guarda hex
-// (ex: "#00d46a"), Icon guarda nome PascalCase de um ícone lucide-react
+// (ex: "#2563EB"), Icon guarda nome PascalCase de um ícone lucide-react
 // (ex: "Sparkles"). Ambos vazios → frontend cai em default (#7c3aed +
 // Building2). AutoMigrate adiciona as colunas com default vazio.
 type Workspace struct {

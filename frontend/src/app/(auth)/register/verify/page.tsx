@@ -146,10 +146,10 @@ function Field({
           style={{
             paddingLeft: icon ? "2.5rem" : undefined,
             paddingRight: rightEl ? "2.75rem" : undefined,
-            borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
+            borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#2563EB" : "var(--border-default)",
             boxShadow: error
               ? "0 0 0 3px rgba(239,68,68,0.08)"
-              : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+              : focused ? "0 0 0 3px rgba(37, 99, 235,0.10)" : "none",
           }}
         />
         {rightEl && (
@@ -193,10 +193,10 @@ function PhoneField({
       <div
         className="grid grid-cols-[92px_1fr] sm:grid-cols-[104px_1fr] rounded-xl border transition-all duration-150 bg-[hsl(240_18%_5%)]"
         style={{
-          borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
+          borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#2563EB" : "var(--border-default)",
           boxShadow: error
             ? "0 0 0 3px rgba(239,68,68,0.08)"
-            : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+            : focused ? "0 0 0 3px rgba(37, 99, 235,0.10)" : "none",
         }}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
@@ -255,7 +255,7 @@ function PhoneField({
                       type="button"
                       onClick={() => chooseCountry(country)}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(240_14%_10%)]"
-                      style={{ color: country.code === countryCode ? "#00d46a" : "hsl(240 15% 92%)" }}
+                      style={{ color: country.code === countryCode ? "#2563EB" : "hsl(240 15% 92%)" }}
                     >
                       <span className="text-base">{country.flag}</span>
                       <span className="min-w-0 flex-1">
@@ -300,7 +300,7 @@ function PasswordStrength({ password }: { password: string }) {
     { label: "Número", ok: /[0-9]/.test(password) },
   ];
   const score = checks.filter(c => c.ok).length;
-  const colors = ["#ef4444", "#fb923c", "#00d46a"];
+  const colors = ["#ef4444", "#fb923c", "#2563EB"];
   const labels = ["Fraca", "Média", "Forte"];
 
   if (!password) return null;
@@ -317,7 +317,7 @@ function PasswordStrength({ password }: { password: string }) {
         <div className="flex gap-3">
           {checks.map(c => (
             <span key={c.label} className="flex items-center gap-1 text-xs"
-              style={{ color: c.ok ? "#00d46a" : "hsl(240 8% 38%)" }}>
+              style={{ color: c.ok ? "#2563EB" : "hsl(240 8% 38%)" }}>
               <CheckCircle2 className="w-3 h-3" />
               {c.label}
             </span>
@@ -704,7 +704,7 @@ function CompleteForm({
         <div className="flex items-center gap-2 mb-1">
           <div
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}
+            style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.2)", color: "#2563EB" }}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             {safeText(email)}
@@ -757,9 +757,9 @@ function CompleteForm({
                       onClick={() => setAccountType(option.id as "personal" | "business")}
                       className="rounded-xl px-4 py-3 text-left transition-all"
                       style={{
-                        background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
-                        border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
-                        boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+                        background: active ? "rgba(37, 99, 235,0.06)" : "hsl(240 18% 5%)",
+                        border: `1px solid ${active ? "#2563EB" : "var(--border-default)"}`,
+                        boxShadow: active ? "0 0 0 3px rgba(37, 99, 235,0.10)" : "none",
                       }}
                     >
                       <span className="block text-sm font-semibold text-[hsl(240_15%_92%)]">{safeText(option.label)}</span>
@@ -861,8 +861,8 @@ function CompleteForm({
                 <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Plano selecionado</label>
                 <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
                   style={{
-                    background: isPaid ? "rgba(0,212,106,0.06)" : "rgba(99,91,255,0.06)",
-                    border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
+                    background: isPaid ? "rgba(37, 99, 235,0.06)" : "rgba(99,91,255,0.06)",
+                    border: `1px solid ${isPaid ? "rgba(37, 99, 235,0.25)" : "rgba(99,91,255,0.25)"}`,
                   }}>
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{safeText(planLabel, "Plano")}</span>
@@ -872,7 +872,7 @@ function CompleteForm({
                         : "Plano grátis — sem cartão de crédito."}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold" style={{ color: isPaid ? "#00d46a" : "#a5a3ff" }}>
+                  <span className="text-sm font-semibold" style={{ color: isPaid ? "#2563EB" : "#a5a3ff" }}>
                     {(planPriceVal ?? 0) > 0
                       ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(planPriceVal as number)
                       : "Grátis"}
@@ -897,9 +897,9 @@ function CompleteForm({
                         onClick={() => setSelectedPlanID(p.id)}
                         className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
                         style={{
-                          background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
-                          border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
-                          boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+                          background: active ? "rgba(37, 99, 235,0.06)" : "hsl(240 18% 5%)",
+                          border: `1px solid ${active ? "#2563EB" : "var(--border-default)"}`,
+                          boxShadow: active ? "0 0 0 3px rgba(37, 99, 235,0.10)" : "none",
                         }}
                       >
                         <div className="flex flex-col">
@@ -908,7 +908,7 @@ function CompleteForm({
                             <span className="text-xs text-[hsl(240_8%_50%)]">{safeText(p.description)}</span>
                           )}
                         </div>
-                        <span className="text-sm font-semibold" style={{ color: active ? "#00d46a" : "hsl(240 15% 80%)" }}>
+                        <span className="text-sm font-semibold" style={{ color: active ? "#2563EB" : "hsl(240 15% 80%)" }}>
                           {priceLabel}
                         </span>
                       </button>
@@ -949,8 +949,8 @@ function CompleteForm({
                     whileTap={{ scale: 0.98 }}
                     className="rounded-xl p-3 text-left transition flex items-center gap-2"
                     style={{
-                      background: active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
-                      border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                      background: active ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
+                      border: `1px solid ${active ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
                       color: active ? "var(--green)" : "var(--text-2)",
                     }}
                   >
@@ -1056,9 +1056,9 @@ function CompleteForm({
             type="button"
             onClick={nextStep}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
-            style={{ background: "#00d46a", color: "#050508" }}
+            style={{ background: "#2563EB", color: "#050508" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#2563EB"}
           >
             <span>
               {step === 2 && isPaid ? "Continuar para pagamento" : "Continuar"}
@@ -1070,9 +1070,9 @@ function CompleteForm({
             type="submit"
             disabled={loading || (isPaid && !asaasMethod)}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{ background: "#00d46a", color: "#050508" }}
+            style={{ background: "#2563EB", color: "#050508" }}
             onMouseEnter={e => { if (!loading && !(isPaid && !asaasMethod)) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
-            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#2563EB"}
           >
             {loading
               ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1139,7 +1139,7 @@ function VerifyContent() {
       className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden"
       style={{
         background:
-          "radial-gradient(1200px 600px at 20% 0%, rgba(0,212,106,0.18), transparent 60%)," +
+          "radial-gradient(1200px 600px at 20% 0%, rgba(37, 99, 235,0.18), transparent 60%)," +
           "radial-gradient(900px 500px at 100% 100%, rgba(99,102,241,0.16), transparent 65%)," +
           "radial-gradient(700px 400px at 50% 50%, rgba(124,58,237,0.10), transparent 70%)," +
           "linear-gradient(180deg, hsl(240 22% 3%) 0%, hsl(240 18% 4%) 50%, hsl(240 22% 3%) 100%)",
@@ -1153,7 +1153,7 @@ function VerifyContent() {
         style={{
           width: 520, height: 520,
           top: "-12%", left: "-10%",
-          background: "radial-gradient(circle, rgba(0,212,106,0.30) 0%, transparent 65%)",
+          background: "radial-gradient(circle, rgba(37, 99, 235,0.30) 0%, transparent 65%)",
           filter: "blur(40px)",
         }}
         animate={{ x: [0, 30, 0], y: [0, 20, 0], opacity: [0.6, 0.9, 0.6] }}
@@ -1184,7 +1184,7 @@ function VerifyContent() {
           border: "1px solid rgba(255,255,255,0.08)",
           boxShadow:
             "0 40px 80px rgba(0,0,0,0.55)," +
-            "0 16px 40px rgba(0,212,106,0.08)," +
+            "0 16px 40px rgba(37, 99, 235,0.08)," +
             "inset 0 1px 0 rgba(255,255,255,0.10)," +
             "inset 0 -1px 0 rgba(0,0,0,0.30)",
         }}
@@ -1199,7 +1199,7 @@ function VerifyContent() {
               <motion.div key="loading"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="flex flex-col items-center gap-4 py-8 text-center">
-                <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#00d46a" }} />
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#2563EB" }} />
                 <p className="text-sm text-[hsl(240_8%_50%)]">Verificando seu link…</p>
               </motion.div>
             )}
@@ -1235,7 +1235,7 @@ function VerifyContent() {
                 <Link
                   href="/register"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                  style={{ background: "#00d46a", color: "#050508" }}
+                  style={{ background: "#2563EB", color: "#050508" }}
                 >
                   Solicitar novo link
                   <ArrowRight className="w-4 h-4" />
@@ -1260,7 +1260,7 @@ function VerifyContent() {
                 <Link
                   href="/register"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                  style={{ background: "#00d46a", color: "#050508" }}
+                  style={{ background: "#2563EB", color: "#050508" }}
                 >
                   Tentar novamente
                   <ArrowRight className="w-4 h-4" />
@@ -1339,15 +1339,15 @@ function AnimatedCardPreview({ card }: { card: { holderName: string; number: str
       style={{
         aspectRatio: "1.586 / 1",
         background: "linear-gradient(135deg, #0a1a14 0%, #0a3a25 45%, #145a3b 100%)",
-        boxShadow: "0 20px 50px rgba(0,212,106,0.18), 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
-        border: "1px solid rgba(0,212,106,0.25)",
+        boxShadow: "0 20px 50px rgba(37, 99, 235,0.18), 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
+        border: "1px solid rgba(37, 99, 235,0.25)",
       }}
     >
       {/* Halo animado */}
       <motion.div
         className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(0,212,106,0.18) 0%, transparent 35%)",
+          background: "radial-gradient(circle, rgba(37, 99, 235,0.18) 0%, transparent 35%)",
         }}
         animate={{ rotate: [0, 360] }}
         transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -1409,8 +1409,8 @@ function SecureHeader({ planLabel, planPriceVal }: { planLabel?: string; planPri
         transition={{ delay: 0.05 }}
         className="rounded-2xl p-4 flex items-center justify-between"
         style={{
-          background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
-          border: "1px solid rgba(0,212,106,0.25)",
+          background: "linear-gradient(135deg, rgba(37, 99, 235,0.10), rgba(37, 99, 235,0.04))",
+          border: "1px solid rgba(37, 99, 235,0.25)",
         }}
       >
         <div>
@@ -1470,7 +1470,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
             className="h-1.5 rounded-full"
             style={{
               background: done || active ? "var(--green)" : "var(--text-4)",
-              boxShadow: active ? "0 0 8px rgba(0,212,106,0.55)" : "none",
+              boxShadow: active ? "0 0 8px rgba(37, 99, 235,0.55)" : "none",
             }}
           />
         );
@@ -1516,8 +1516,8 @@ function PixQrInlineView({
       <div
         className="rounded-2xl p-4 text-center"
         style={{
-          background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
-          border: "1px solid rgba(0,212,106,0.25)",
+          background: "linear-gradient(135deg, rgba(37, 99, 235,0.10), rgba(37, 99, 235,0.04))",
+          border: "1px solid rgba(37, 99, 235,0.25)",
         }}
       >
         <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
@@ -1549,8 +1549,8 @@ function PixQrInlineView({
         onClick={copy}
         className="rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
         style={{
-          background: copied ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
-          border: `1px solid ${copied ? "rgba(0,212,106,0.35)" : "var(--surface-border)"}`,
+          background: copied ? "rgba(37, 99, 235,0.15)" : "var(--surface-2)",
+          border: `1px solid ${copied ? "rgba(37, 99, 235,0.35)" : "var(--surface-border)"}`,
           color: copied ? "var(--green)" : "var(--text-1)",
         }}
       >
@@ -1583,7 +1583,7 @@ function PixQrInlineView({
   );
 }
 
-// PROVIDER_LOGOS — catálogo dos provedores de pagamento que a Uniq
+// PROVIDER_LOGOS — catálogo dos provedores de pagamento que a Qchat
 // integra. Cada um traz o nome de exibição + a URL do logo
 // (preferimos SVG hospedado pelo próprio provider pra ficar sempre
 // atualizado). Como vamos rotacionar provider (Asaas hoje, Abacatepay

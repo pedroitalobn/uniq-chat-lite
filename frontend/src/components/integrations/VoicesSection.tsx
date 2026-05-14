@@ -58,7 +58,7 @@ export function VoicesSection() {
     enabled: !!workspaceId,
   });
 
-  // Uniq Voice: TTS gerenciado pela plataforma. Se o super admin
+  // Qchat Voice: TTS gerenciado pela plataforma. Se o super admin
   // configurou + o plano do user libera, mostramos um card destaque
   // permitindo usar sem precisar configurar provider próprio.
   // Backend faz o gating real (plan.allow_voice + active config); aqui
@@ -140,14 +140,14 @@ export function VoicesSection() {
         </button>
       </div>
 
-      {/* Uniq Voice — card destaque quando platform tem voice configurado.
+      {/* Qchat Voice — card destaque quando platform tem voice configurado.
           Aparece antes da lista de providers próprios. Não requer setup —
           se o plano libera + super admin configurou, agentes já podem usar. */}
       {uniqVoice && (
         <div
           className="rounded-2xl p-4 flex items-start gap-3"
           style={{
-            background: "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(0,212,106,0.06))",
+            background: "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(37, 99, 235,0.06))",
             border: "1px solid rgba(245,158,11,0.30)",
           }}
         >
@@ -158,10 +158,10 @@ export function VoicesSection() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-                Uniq Voice
+                Qchat Voice
               </h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}>
+                style={{ background: "rgba(37, 99, 235,0.12)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.25)" }}>
                 Disponível
               </span>
             </div>
@@ -169,7 +169,7 @@ export function VoicesSection() {
               TTS gerenciado pela plataforma — sem precisar configurar provider próprio. Já pode ser usado direto pelos seus agentes.
             </p>
             <p className="text-[11px] mt-1.5" style={{ color: "var(--text-3)" }}>
-              Quer usar API key própria? Adicione um provider abaixo (ElevenLabs, OpenAI TTS, etc.) — ele tem prioridade sobre o Uniq Voice.
+              Quer usar API key própria? Adicione um provider abaixo (ElevenLabs, OpenAI TTS, etc.) — ele tem prioridade sobre o Qchat Voice.
             </p>
           </div>
         </div>

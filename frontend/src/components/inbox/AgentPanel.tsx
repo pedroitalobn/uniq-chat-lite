@@ -29,9 +29,9 @@ interface SuggestionResult {
 const MODE_CONFIG: Record<AgentMode, { label: string; color: string; bg: string; border: string; icon: React.ElementType; description: string }> = {
   active: {
     label: "IA Ativa",
-    color: "#00d46a",
-    bg: "rgba(0,212,106,0.08)",
-    border: "rgba(0,212,106,0.2)",
+    color: "#2563EB",
+    bg: "rgba(37, 99, 235,0.08)",
+    border: "rgba(37, 99, 235,0.2)",
     icon: Bot,
     description: "Agente responde automaticamente",
   },
@@ -223,10 +223,10 @@ export function AgentPanel({ workspaceId, conversationId, onSendSuggestion }: Pr
                 onClick={() => { onSendSuggestion(suggestion); setLocalSuggestion(""); }}
                 className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg w-full justify-center transition-all hover:scale-[1.01]"
                 style={{
-                  background: "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.08))",
+                  background: "linear-gradient(135deg, rgba(37, 99, 235,0.18), rgba(37, 99, 235,0.08))",
                   color: "var(--green)",
-                  border: "1px solid rgba(0,212,106,0.25)",
-                  boxShadow: "0 2px 12px rgba(0,212,106,0.12)",
+                  border: "1px solid rgba(37, 99, 235,0.25)",
+                  boxShadow: "0 2px 12px rgba(37, 99, 235,0.12)",
                 }}
               >
                 <Send className="w-3 h-3" />

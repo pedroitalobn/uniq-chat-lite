@@ -27,7 +27,7 @@ export interface MessageButton {
 const MAX_BUTTONS = 3;
 
 const TYPES: { id: MessageButtonType; label: string; icon: React.ElementType; color: string }[] = [
-  { id: "reply", label: "Resposta",  icon: MessageCircle, color: "#00d46a" },
+  { id: "reply", label: "Resposta",  icon: MessageCircle, color: "#2563EB" },
   { id: "url",   label: "Link",      icon: ExternalLink,  color: "#3b82f6" },
   { id: "call",  label: "Ligar",     icon: Phone,         color: "#a78bfa" },
   { id: "copy",  label: "Copiar",    icon: CopyIcon,      color: "#fbbf24" },
@@ -178,7 +178,7 @@ export function MessageButtonsBuilder({
         <button
           onClick={add}
           className="flex items-center justify-center gap-1 w-full py-1.5 rounded-lg text-[11px] font-medium transition-colors"
-          style={{ background: "rgba(0,212,106,0.08)", border: "1px dashed rgba(0,212,106,0.3)", color: "var(--green)" }}
+          style={{ background: "rgba(37, 99, 235,0.08)", border: "1px dashed rgba(37, 99, 235,0.3)", color: "var(--green)" }}
         >
           <Plus className="w-3 h-3" />
           Adicionar botão ({buttons.length}/{MAX_BUTTONS})

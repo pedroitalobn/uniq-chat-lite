@@ -399,7 +399,7 @@ func main() {
 	app := api.SetupRouter(db, manager, agentRuntime)
 
 	addr := ":" + cfg.Port
-	log.Info().Str("addr", addr).Msg("Uniq.chat API starting")
+	log.Info().Str("addr", addr).Msg("Qchat API starting")
 
 	// Graceful shutdown — ouve SIGTERM/SIGINT e drena conexões antes de
 	// matar o processo. Sem isso o Dokploy/K8s mata 30s depois e

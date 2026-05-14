@@ -121,7 +121,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         ) : (
           <div
             className="flex h-9 w-9 items-center justify-center rounded-lg"
-            style={{ background: "rgba(0,212,106,0.08)" }}
+            style={{ background: "rgba(37, 99, 235,0.08)" }}
           >
             <Building2 className="h-4 w-4" style={{ color: uniq.green }} />
           </div>
@@ -220,7 +220,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
               <Link
                 key={d.id}
                 href={`/crm/deals/${d.id}`}
-                className="flex items-center justify-between rounded-xl p-3 transition-colors hover:border-[rgba(0,212,106,0.3)]"
+                className="flex items-center justify-between rounded-xl p-3 transition-colors hover:border-[rgba(37, 99, 235,0.3)]"
                 style={cardStyle}
               >
                 <div className="min-w-0">
@@ -453,7 +453,7 @@ function Avatar({ name, url }: { name: string; url?: string }) {
   return (
     <div
       className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
-      style={{ background: "rgba(0,212,106,0.08)", color: uniq.green }}
+      style={{ background: "rgba(37, 99, 235,0.08)", color: uniq.green }}
     >
       {initials || "?"}
     </div>

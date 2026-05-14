@@ -238,13 +238,13 @@ export function mapAgent(data: any): AgentForm {
 }
 
 // Readiness — quantos requisitos básicos pra ativar o agente estão
-// preenchidos. usingUniqAI: sem integration_id custom, cai no provider
+// preenchidos. usingQChatAI: sem integration_id custom, cai no provider
 // default da plataforma e o backend resolve modelo automaticamente.
 export function computeReadiness(form: AgentForm) {
-  const usingUniqAI = !form.integration_id;
+  const usingQChatAI = !form.integration_id;
   return {
-    hasLLM: usingUniqAI || !!form.integration_id,
-    hasModel: usingUniqAI || !!form.model.trim(),
+    hasLLM: usingQChatAI || !!form.integration_id,
+    hasModel: usingQChatAI || !!form.model.trim(),
     hasIdentity: !!form.identity.trim() || !!form.agent_name.trim(),
     hasInstructions: !!form.system_prompt.trim() || !!form.service_instructions.trim(),
   };

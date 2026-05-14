@@ -128,9 +128,9 @@ func Load() *Config {
 		// admin deve setar via /admin/providers ou env MAILEROO_API_KEY.
 		MailerooAPIKey:      getEnv("MAILEROO_API_KEY", ""),
 		MailerooSenderEmail: getEnv("MAILEROO_SENDER_EMAIL", "mail@uniq.chat"),
-		MailerooSenderName:  getEnv("MAILEROO_SENDER_NAME", "Uniq.chat"),
+		MailerooSenderName:  getEnv("MAILEROO_SENDER_NAME", "Qchat"),
 
-		AppName: getEnv("APP_NAME", "Uniq.chat"),
+		AppName: getEnv("APP_NAME", "Qchat"),
 		AppURL:  getEnv("APP_URL", getEnv("FRONTEND_URL", "http://localhost:3000")),
 		APIURL:  getEnv("API_URL", getEnv("BACKEND_URL", "http://localhost:8080")),
 

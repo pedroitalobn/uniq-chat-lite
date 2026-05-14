@@ -34,7 +34,7 @@ export function WorkspaceTabs({ workspaceId, className }: {
             className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
             style={
               active
-                ? { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
+                ? { background: "rgba(37, 99, 235,0.12)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.25)" }
                 : { background: "transparent", color: "var(--text-3)", border: "1px solid transparent" }
             }
           >

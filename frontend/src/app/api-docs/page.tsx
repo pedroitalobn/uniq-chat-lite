@@ -98,13 +98,13 @@ const SECTIONS: Section[] = [
       { method: "POST", path: "/v1/{server}/{instance}/messages/contact", description: "Enviar contato como vCard", auth: "token", body: { to: "5511999999999@s.whatsapp.net", contact: { name: "João", phone: "5511888888888" } } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/reaction", description: "Reagir a uma mensagem com emoji", auth: "token", body: { to: "5511999999999@s.whatsapp.net", message_id: "...", emoji: "👍" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/poll", description: "Enviar enquete", auth: "token", body: { to: "5511999999999@s.whatsapp.net", question: "Qual opção?", options: ["A", "B", "C"] } },
-      { method: "POST", path: "/v1/{server}/{instance}/messages/buttons", description: "Enviar mensagem com botões interativos (reply, url, call, copy). Máx. 3 botões — renderiza como NativeFlow no WhatsApp.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", body: "Escolha uma opção", footer: "Uniq.chat", buttons: [{ id: "sim", text: "Sim", type: "reply" }, { text: "Abrir site", type: "url", url: "https://uniq.chat" }, { text: "Copiar cupom", type: "copy", copy_code: "BLACKFRIDAY20" }] }, response: `{ "status": "sent", "messageId": "..." }` },
-      { method: "POST", path: "/v1/{server}/{instance}/messages/template", description: "Alias de /messages/buttons com mapping para o formato Cloud API (display_text/quickreply/url/call). Máx. 3 botões.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", content: "Conteúdo do template", footer: "Uniq.chat", buttons: [{ display_text: "Confirmar", type: "quickreply", id: "yes" }, { display_text: "Visitar site", type: "url", url: "https://uniq.chat" }, { display_text: "Ligar", type: "call", phone_number: "+5511999999999" }] } },
-      { method: "POST", path: "/v1/{server}/{instance}/messages/list", description: "Enviar lista estruturada com seções e itens selecionáveis.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", title: "Catálogo", description: "Escolha uma opção", button_text: "Ver opções", footer: "Uniq.chat", sections: [{ title: "Atendimento", rows: [{ id: "suporte", title: "Suporte", description: "Falar com um humano" }, { id: "financeiro", title: "Financeiro", description: "2ª via e pagamentos" }] }] } },
-      { method: "POST", path: "/v1/{server}/{instance}/messages/pix", description: "Enviar cobrança PIX como mensagem interativa (review_and_pay). Suporta CPF, CNPJ, EMAIL, PHONE e EVP.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", merchant_name: "Uniq Chat", pix_key: "pagamentos@uniq.chat", key_type: "EMAIL", header_title: "Pagamento", body_text: "Toque em 'Pagar' para concluir a compra.", footer_text: "Uniq.chat" } },
+      { method: "POST", path: "/v1/{server}/{instance}/messages/buttons", description: "Enviar mensagem com botões interativos (reply, url, call, copy). Máx. 3 botões — renderiza como NativeFlow no WhatsApp.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", body: "Escolha uma opção", footer: "Qchat", buttons: [{ id: "sim", text: "Sim", type: "reply" }, { text: "Abrir site", type: "url", url: "https://uniq.chat" }, { text: "Copiar cupom", type: "copy", copy_code: "BLACKFRIDAY20" }] }, response: `{ "status": "sent", "messageId": "..." }` },
+      { method: "POST", path: "/v1/{server}/{instance}/messages/template", description: "Alias de /messages/buttons com mapping para o formato Cloud API (display_text/quickreply/url/call). Máx. 3 botões.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", content: "Conteúdo do template", footer: "Qchat", buttons: [{ display_text: "Confirmar", type: "quickreply", id: "yes" }, { display_text: "Visitar site", type: "url", url: "https://uniq.chat" }, { display_text: "Ligar", type: "call", phone_number: "+5511999999999" }] } },
+      { method: "POST", path: "/v1/{server}/{instance}/messages/list", description: "Enviar lista estruturada com seções e itens selecionáveis.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", title: "Catálogo", description: "Escolha uma opção", button_text: "Ver opções", footer: "Qchat", sections: [{ title: "Atendimento", rows: [{ id: "suporte", title: "Suporte", description: "Falar com um humano" }, { id: "financeiro", title: "Financeiro", description: "2ª via e pagamentos" }] }] } },
+      { method: "POST", path: "/v1/{server}/{instance}/messages/pix", description: "Enviar cobrança PIX como mensagem interativa (review_and_pay). Suporta CPF, CNPJ, EMAIL, PHONE e EVP.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", merchant_name: "Qchat", pix_key: "pagamentos@uniq.chat", key_type: "EMAIL", header_title: "Pagamento", body_text: "Toque em 'Pagar' para concluir a compra.", footer_text: "Qchat" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/pix-button", description: "Alias minimalista do /pix — só pix_key + key_type. Header/body/footer gerados automaticamente.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", pix_key: "pagamentos@uniq.chat", key_type: "EMAIL" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/carousel", description: "Enviar carrossel horizontal de cards (HSCROLL_CARDS). Cada card tem header, body e até 3 botões.", auth: "token", body: { to: "5511999999999@s.whatsapp.net", cards: [{ header: { title: "Plano Starter", image_url: "https://picsum.photos/seed/starter/720/480" }, body: "Para times pequenos.", buttons: [{ text: "Conhecer", type: "url", url: "https://uniq.chat/precos" }] }] } },
-      { method: "POST", path: "/v1/{server}/{instance}/messages/menu", description: "Endpoint unificado (DSL): aceita type=button|list|poll|carousel e converte choices para a stanza correta.", auth: "token", body: { number: "5511999999999", type: "list", text: "Escolha uma opção", listButton: "Abrir menu", footerText: "Uniq.chat", choices: ["[Atendimento]", "Suporte|suporte|Falar com suporte", "Financeiro|financeiro|2ª via"] } },
+      { method: "POST", path: "/v1/{server}/{instance}/messages/menu", description: "Endpoint unificado (DSL): aceita type=button|list|poll|carousel e converte choices para a stanza correta.", auth: "token", body: { number: "5511999999999", type: "list", text: "Escolha uma opção", listButton: "Abrir menu", footerText: "Qchat", choices: ["[Atendimento]", "Suporte|suporte|Falar com suporte", "Financeiro|financeiro|2ª via"] } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/link", description: "Texto com preview de link automático (foto + título extraídos pelo WhatsApp).", auth: "token", body: { to: "5511999999999@s.whatsapp.net", text: "Confira: https://uniq.chat" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/status", description: "Publicar status/story em texto, imagem ou vídeo", auth: "token", body: { text: "Bom dia, clientes!", bg_color: "#103529" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/payment-request", description: "Enviar solicitação de pagamento via WhatsApp Pay", auth: "token", body: { to: "5511999999999@s.whatsapp.net", amount: 99.90, currency: "BRL", note: "Pedido #1234" } },
@@ -137,7 +137,7 @@ const SECTIONS: Section[] = [
     badge: "V1 API",
     endpoints: [
       { method: "GET",  path: "/v1/{server}/{instance}/profile", description: "Obter perfil do número conectado (nome, about, foto)", auth: "token", response: `{ "name": "...", "about": "...", "picture": "..." }` },
-      { method: "PUT",  path: "/v1/{server}/{instance}/profile/name", description: "Atualizar nome de exibição (push name) da conta conectada.", auth: "token", body: { name: "Uniq Chat" } },
+      { method: "PUT",  path: "/v1/{server}/{instance}/profile/name", description: "Atualizar nome de exibição (push name) da conta conectada.", auth: "token", body: { name: "Qchat" } },
       { method: "PUT",  path: "/v1/{server}/{instance}/profile/status", description: "Atualizar status/recado da conta.", auth: "token", body: { status: "Disponível" } },
       { method: "PUT",  path: "/v1/{server}/{instance}/profile/picture", description: "Atualizar/remover foto de perfil. remove=true ignora url/base64.", auth: "token", body: { url: "https://...jpg" } },
       { method: "GET",  path: "/v1/{server}/{instance}/business-profile/{jid}", description: "Perfil de empresa de um contato — catálogo, horário, email, site, descrição.", auth: "token" },
@@ -279,8 +279,8 @@ const SECTIONS: Section[] = [
       { method: "PUT",    path: "/v1/crm/contacts/{id}", description: "Atualizar contato (nome, e-mail, funnel, stage, journey, notes, owner)", auth: "bearer", body: { name: "Novo Nome", funnel: "Vendas", stage: "Proposta" } },
       { method: "DELETE", path: "/v1/crm/contacts/{id}", description: "Remover contato", auth: "bearer" },
       { method: "PUT",    path: "/v1/crm/contacts/{id}/tags", description: "Atribuir ou remover tags de um contato", auth: "bearer", body: { tags: ["vip", "cliente"] } },
-      { method: "GET",    path: "/v1/crm/tags", description: "Listar todas as tags disponíveis", auth: "bearer", response: `[{ "id": "...", "name": "vip", "color": "#00d46a" }]` },
-      { method: "POST",   path: "/v1/crm/tags", description: "Criar nova tag", auth: "bearer", body: { name: "vip", color: "#00d46a" } },
+      { method: "GET",    path: "/v1/crm/tags", description: "Listar todas as tags disponíveis", auth: "bearer", response: `[{ "id": "...", "name": "vip", "color": "#2563EB" }]` },
+      { method: "POST",   path: "/v1/crm/tags", description: "Criar nova tag", auth: "bearer", body: { name: "vip", color: "#2563EB" } },
       { method: "DELETE", path: "/v1/crm/tags/{id}", description: "Remover tag", auth: "bearer" },
       { method: "GET",    path: "/v1/crm/funnels", description: "Listar funis de vendas", auth: "bearer", response: `[{ "id": "...", "name": "Vendas", "stages": [] }]` },
       { method: "POST",   path: "/v1/crm/funnels", description: "Criar novo funil", auth: "bearer", body: { name: "Vendas Enterprise" } },
@@ -625,7 +625,7 @@ const SECTIONS: Section[] = [
       { method: "POST",   path: "/v1/instances/{id}/waba/phone-numbers/{phoneId}/verify-code", description: "Verificar código recebido e completar o registro do número.", auth: "bearer", body: { code: "123456" }, response: `{ "success": true }` },
       // ── Templates ───────────────────────────────────────────────────────
       { method: "GET",    path: "/v1/instances/{id}/waba/templates", description: "Listar templates HSM com status (APPROVED/PENDING/REJECTED), categoria e componentes.", auth: "bearer", response: `{ "data": [{ "id": "...", "name": "confirmacao_pedido", "status": "APPROVED", "category": "UTILITY", "language": "pt_BR", "components": [{ "type": "BODY", "text": "Olá {{1}}, pedido {{2}} confirmado." }] }] }` },
-      { method: "POST",   path: "/v1/instances/{id}/waba/templates", description: "Criar template HSM. Categorias: MARKETING | UTILITY | AUTHENTICATION. Status inicial: PENDING — aprovação em minutos a horas.", auth: "bearer", body: { name: "confirmacao_pedido", language: "pt_BR", category: "UTILITY", components: [{ type: "HEADER", format: "TEXT", text: "Pedido confirmado" }, { type: "BODY", text: "Olá {{1}}, seu pedido {{2}} foi confirmado. Entrega em {{3}} dias." }, { type: "FOOTER", text: "Uniq.chat" }, { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Ver pedido" }] }] }, response: `{ "id": "...", "status": "PENDING" }` },
+      { method: "POST",   path: "/v1/instances/{id}/waba/templates", description: "Criar template HSM. Categorias: MARKETING | UTILITY | AUTHENTICATION. Status inicial: PENDING — aprovação em minutos a horas.", auth: "bearer", body: { name: "confirmacao_pedido", language: "pt_BR", category: "UTILITY", components: [{ type: "HEADER", format: "TEXT", text: "Pedido confirmado" }, { type: "BODY", text: "Olá {{1}}, seu pedido {{2}} foi confirmado. Entrega em {{3}} dias." }, { type: "FOOTER", text: "Qchat" }, { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Ver pedido" }] }] }, response: `{ "id": "...", "status": "PENDING" }` },
       { method: "GET",    path: "/v1/instances/{id}/waba/templates/{templateId}", description: "Buscar template por ID — útil para checar status de aprovação após criação.", auth: "bearer", response: `{ "id": "...", "name": "...", "status": "APPROVED", "components": [...] }` },
       { method: "POST",   path: "/v1/instances/{id}/waba/templates/{templateId}", description: "Editar components de template existente (name e language são imutáveis). Template APPROVED volta a PENDING.", auth: "bearer", body: { components: [{ type: "BODY", text: "Olá {{1}}, confirmamos o pedido {{2}}." }] } },
       { method: "DELETE", path: "/v1/instances/{id}/waba/templates/{name}", description: "Deletar template pelo nome (irreversível — remove da Meta imediatamente).", auth: "bearer" },
@@ -715,7 +715,7 @@ const METHOD_COLORS: Record<string, { bg: string; text: string }> = {
 type TabId = "account" | "business" | "waba" | "ig-profile" | "ig-api";
 
 const TABS: { id: TabId; label: string; color: string; description: string; comingSoon?: boolean }[] = [
-  { id: "account",    label: "Uniq Account",      color: "#00d46a", description: "Auth, workspaces, CRM, campanhas, billing e AI — comum a toda a plataforma" },
+  { id: "account",    label: "Qchat Account",      color: "#2563EB", description: "Auth, workspaces, CRM, campanhas, billing e AI — comum a toda a plataforma" },
   { id: "business",   label: "Business API",       color: "#25d366", description: "WhatsApp via whatsmeow (QR/pairing) — mensagens, grupos, OTP, inbox" },
   { id: "waba",       label: "WABA",               color: "#3b82f6", description: "WhatsApp Cloud API oficial (Meta) — templates HSM, janela 24h" },
   { id: "ig-profile", label: "Instagram Profile",  color: "#e1306c", description: "Instagram não-oficial — DMs, follow, stories, automação" },
@@ -723,7 +723,7 @@ const TABS: { id: TabId; label: string; color: string; description: string; comi
 ];
 
 const SECTION_TABS: Record<string, TabId> = {
-  // Uniq Account
+  // Qchat Account
   auth: "account", apikeys: "account", "instances-mgmt": "account",
   webhooks: "account", media: "account", crm: "account",
   campaigns: "account", integrations: "account", "ai-chat": "account",
@@ -967,12 +967,12 @@ export default function ApiDocsPage() {
               <BookOpen className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               <span className="text-sm font-medium" style={{ color: "hsl(240 8% 70%)" }}>API Reference</span>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>v1</span>
+            <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(37, 99, 235,0.1)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.2)" }}>v1</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs hidden sm:block" style={{ color: "var(--text-4)" }}>{totalEndpoints} endpoints</span>
             <a href="/login" className="text-xs px-4 py-2 rounded-lg font-medium transition-opacity hover:opacity-80"
-              style={{ background: "rgba(0,212,106,0.15)", border: "1px solid rgba(0,212,106,0.3)", color: "#00d46a" }}>
+              style={{ background: "rgba(37, 99, 235,0.15)", border: "1px solid rgba(37, 99, 235,0.3)", color: "#2563EB" }}>
               Acessar plataforma →
             </a>
           </div>

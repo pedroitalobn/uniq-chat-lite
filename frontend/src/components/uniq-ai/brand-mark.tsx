@@ -3,19 +3,19 @@
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
-type UniqAIBrandMarkProps = {
+type QChatAIBrandMarkProps = {
   className?: string;
   style?: CSSProperties;
   stroke?: string;
   glow?: boolean;
 };
 
-export function UniqAIBrandMark({
+export function QChatAIBrandMark({
   className,
   style,
   stroke = "currentColor",
   glow = false,
-}: UniqAIBrandMarkProps) {
+}: QChatAIBrandMarkProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

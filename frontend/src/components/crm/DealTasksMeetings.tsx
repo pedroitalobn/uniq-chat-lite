@@ -130,7 +130,7 @@ function TasksSection({ workspaceId, scope }: { workspaceId: string; scope: Enti
               style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
             <button onClick={() => createMut.mutate()} disabled={!title.trim() || createMut.isPending}
               className="px-2 py-1.5 rounded text-[11px] font-medium disabled:opacity-50"
-              style={{ background: "#00d46a", color: "#03170a" }}>
+              style={{ background: "#2563EB", color: "#03170a" }}>
               {createMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Criar"}
             </button>
           </div>
@@ -150,9 +150,9 @@ function TasksSection({ workspaceId, scope }: { workspaceId: string; scope: Enti
                 <button onClick={() => !done && completeMut.mutate(t.id)} disabled={done}
                   className="w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center"
                   style={done
-                    ? { background: "rgba(0,212,106,0.18)", border: "1px solid rgba(0,212,106,0.4)" }
+                    ? { background: "rgba(37, 99, 235,0.18)", border: "1px solid rgba(37, 99, 235,0.4)" }
                     : { background: "transparent", border: "1px solid hsl(240 12% 22%)" }}>
-                  {done && <CheckCircle2 className="w-2.5 h-2.5" style={{ color: "#00d46a" }} />}
+                  {done && <CheckCircle2 className="w-2.5 h-2.5" style={{ color: "#2563EB" }} />}
                 </button>
                 <span className="flex-1 text-xs truncate"
                   style={{ color: done ? "var(--text-3)" : "var(--text-2)", textDecoration: done ? "line-through" : undefined }}>
@@ -238,7 +238,7 @@ function MeetingsSection({ workspaceId, scope }: { workspaceId: string; scope: E
           <button onClick={() => createMut.mutate()}
             disabled={!title.trim() || !startAt || !endAt || createMut.isPending}
             className="w-full px-2 py-1.5 rounded text-[11px] font-medium disabled:opacity-50"
-            style={{ background: "#00d46a", color: "#03170a" }}>
+            style={{ background: "#2563EB", color: "#03170a" }}>
             {createMut.isPending ? "Salvando..." : "Agendar"}
           </button>
         </div>

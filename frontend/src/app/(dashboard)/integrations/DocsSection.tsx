@@ -34,7 +34,7 @@ interface Section {
 
 const METHOD_STYLE: Record<string, { bg: string; color: string }> = {
   GET:    { bg: "rgba(96,165,250,0.08)",   color: "#60a5fa" },
-  POST:   { bg: "rgba(0,212,106,0.08)",    color: "#00d46a" },
+  POST:   { bg: "rgba(37, 99, 235,0.08)",    color: "#2563EB" },
   PUT:    { bg: "rgba(251,191,36,0.08)",    color: "#fbbf24" },
   PATCH:  { bg: "rgba(249,115,22,0.08)",    color: "#fb923c" },
   DELETE: { bg: "rgba(239,68,68,0.08)",     color: "#f87171" },
@@ -164,7 +164,7 @@ const SECTIONS: Section[] = [
         body: {
           to:      { type: "string", required: true, description: "Número destinatário",      example: "5511999999999" },
           body:    { type: "string", required: true, description: "Texto principal",          example: "Escolha uma opção" },
-          footer:  { type: "string", required: false,description: "Rodapé (opcional)",         example: "Uniq.chat" },
+          footer:  { type: "string", required: false,description: "Rodapé (opcional)",         example: "Qchat" },
           buttons: { type: "array",  required: true, description: "Máx. 3 botões. Tipos: reply, url, call, copy", example: '[{"id":"sim","text":"Sim","type":"reply"},{"text":"Abrir site","type":"url","url":"https://uniq.chat"},{"text":"Copiar cupom","type":"copy","copy_code":"BLACKFRIDAY20"}]' },
         } },
       { method: "POST", path: "/instances/{id}/messages/template",     summary: "Template (alias de /buttons em formato Cloud API)", pathParams: ["id"],
@@ -186,12 +186,12 @@ const SECTIONS: Section[] = [
       { method: "POST", path: "/instances/{id}/messages/pix",          summary: "Cobrança PIX interativa (review_and_pay)", pathParams: ["id"],
         body: {
           to:            { type: "string", required: true, description: "Número destinatário",            example: "5511999999999" },
-          merchant_name: { type: "string", required: true, description: "Nome do recebedor",              example: "Uniq Chat" },
+          merchant_name: { type: "string", required: true, description: "Nome do recebedor",              example: "Qchat" },
           pix_key:       { type: "string", required: true, description: "Chave PIX",                       example: "pagamentos@uniq.chat" },
           key_type:      { type: "string", required: true, description: "CPF | CNPJ | EMAIL | PHONE | EVP", example: "EMAIL" },
           header_title:  { type: "string", required: false,description: "Título do card",                   example: "Pagamento" },
           body_text:     { type: "string", required: false,description: "Texto principal",                  example: "Toque em Pagar para concluir." },
-          footer_text:   { type: "string", required: false,description: "Rodapé",                            example: "Uniq.chat" },
+          footer_text:   { type: "string", required: false,description: "Rodapé",                            example: "Qchat" },
         } },
       { method: "POST", path: "/instances/{id}/messages/carousel",     summary: "Carrossel de cards (HSCROLL)", pathParams: ["id"],
         body: {
@@ -204,7 +204,7 @@ const SECTIONS: Section[] = [
           type:       { type: "string", required: true, description: "button | list | poll | carousel", example: "list" },
           text:       { type: "string", required: true, description: "Texto principal",        example: "Escolha uma opção" },
           listButton: { type: "string", required: false,description: "Texto do botão (list)",   example: "Abrir menu" },
-          footerText: { type: "string", required: false,description: "Rodapé",                  example: "Uniq.chat" },
+          footerText: { type: "string", required: false,description: "Rodapé",                  example: "Qchat" },
           choices:    { type: "array",  required: true, description: "Opções em formato texto", example: '["[Atendimento]","Suporte|suporte|Falar com suporte"]' },
         } },
       { method: "POST", path: "/instances/{id}/messages/sticker",      summary: "Enviar sticker/figurinha",    pathParams: ["id"],
@@ -298,7 +298,7 @@ const SECTIONS: Section[] = [
           count:      { type: "number", required: false, description: "Qtd msgs (default 50)",      example: "100" },
         } },
       { method: "PUT",  path: "/instances/{id}/profile/name",          summary: "Atualizar nome (push name) da conta", pathParams: ["id"],
-        body: { name: { type: "string", required: true, description: "Novo nome", example: "Uniq Chat" } } },
+        body: { name: { type: "string", required: true, description: "Novo nome", example: "Qchat" } } },
       { method: "PUT",  path: "/instances/{id}/profile/status",        summary: "Atualizar status/recado", pathParams: ["id"],
         body: { status: { type: "string", required: true, description: "Status curto", example: "Disponível" } } },
       { method: "PUT",  path: "/instances/{id}/profile/picture",       summary: "Atualizar/remover foto de perfil", pathParams: ["id"],
@@ -616,7 +616,7 @@ const SECTIONS: Section[] = [
       { method: "POST",   path: "/crm/tags",            summary: "Criar tag",
         body: {
           name:  { type: "string", required: true,  description: "Nome da tag",  example: "Cliente VIP" },
-          color: { type: "string", required: false, description: "Cor hex",       example: "#00d46a" },
+          color: { type: "string", required: false, description: "Cor hex",       example: "#2563EB" },
         } },
       { method: "DELETE", path: "/crm/tags/{id}",        summary: "Remover tag",          pathParams: ["id"] },
       { method: "GET",    path: "/crm/funnels",          summary: "Listar funis de vendas" },
@@ -1086,16 +1086,16 @@ function CopyBtn({
       )}
       style={{
         background: copied
-          ? "rgba(0,212,106,0.15)"
+          ? "rgba(37, 99, 235,0.15)"
           : isPrimary
-            ? "rgba(0,212,106,0.08)"
+            ? "rgba(37, 99, 235,0.08)"
             : "var(--surface-2)",
         border: copied
-          ? "1px solid rgba(0,212,106,0.3)"
+          ? "1px solid rgba(37, 99, 235,0.3)"
           : isPrimary
-            ? "1px solid rgba(0,212,106,0.2)"
+            ? "1px solid rgba(37, 99, 235,0.2)"
             : "1px solid var(--border-default)",
-        color: copied || isPrimary ? "#00d46a" : "var(--text-3)",
+        color: copied || isPrimary ? "#2563EB" : "var(--text-3)",
       }}
     >
       {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
@@ -1213,9 +1213,9 @@ function EndpointCard({
                   onClick={() => setShowRaw((v) => !v)}
                   className="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
                   style={{
-                    background: showRaw ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-                    border: "1px solid " + (showRaw ? "rgba(0,212,106,0.2)" : "var(--surface-2)"),
-                    color: showRaw ? "#00d46a" : "var(--text-3)",
+                    background: showRaw ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+                    border: "1px solid " + (showRaw ? "rgba(37, 99, 235,0.2)" : "var(--surface-2)"),
+                    color: showRaw ? "#2563EB" : "var(--text-3)",
                   }}
                 >
                   {showRaw ? "Tabela" : "JSON cru"}
@@ -1355,7 +1355,7 @@ export function DocsSection() {
             <span style={{ color: "#a78bfa" }}>/v1/</span>
             <span style={{ color: "#fbbf24" }}>{"{server-slug}"}</span>
             <span style={{ color: "#a78bfa" }}>/</span>
-            <span style={{ color: "#00d46a" }}>{"{instance-slug}"}</span>
+            <span style={{ color: "#2563EB" }}>{"{instance-slug}"}</span>
             <span style={{ color: "hsl(240 8% 55%" }}>/messages/text</span>
           </code>
         </div>

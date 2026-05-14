@@ -4,10 +4,10 @@
 //
 // Mostra:
 //   • Totais agregados últimos N dias: créditos cobrados (revenue),
-//     custo bruto Uniq (USD micros), margem efetiva, qtd de events,
+//     custo bruto  Qchat (USD micros), margem efetiva, qtd de events,
 //     créditos em overage.
 //   • Breakdown por categoria (AI/Voice/Mensagens/Proxy).
-//   • Por provider — quanto a Uniq paga a cada um (OpenAI, Anthropic,
+//   • Por provider — quanto a  Qchat paga a cada um (OpenAI, Anthropic,
 //     ElevenLabs, etc.) — pra acompanhar custo total e renegociar.
 //   • Top 25 users por consumo.
 //   • Timeseries de créditos × cost_usd_micro pra ver evolução.
@@ -21,8 +21,8 @@ import { adminUsageApi, type GlobalUsageData } from "@/lib/api";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
 
 const CATEGORY_LABEL: Record<string, string> = {
-  ai: "Uniq AI",
-  voice: "Uniq Voice",
+  ai: "QChat AI",
+  voice: "Qchat Voice",
   message: "Mensagens",
   proxy: "Proxy",
   other: "Outros",
@@ -68,7 +68,7 @@ export default function AdminUsagePage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto space-y-6">
-      <ModuleHeader title="Consumo Global" subtitle="Dashboard administrativo · Uniq Credits" icon={Zap} />
+      <ModuleHeader title="Consumo Global" subtitle="Dashboard administrativo · Qchat Credits" icon={Zap} />
 
       {/* Period filter */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -79,7 +79,7 @@ export default function AdminUsagePage() {
             onClick={() => setDays(d)}
             className="text-xs px-2.5 py-1 rounded-full font-medium transition-colors"
             style={days === d
-              ? { background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }
+              ? { background: "rgba(37, 99, 235,0.18)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.35)" }
               : { background: "var(--surface-3)", color: "var(--text-2)", border: "1px solid var(--surface-border)" }
             }
           >Últimos {d}d</button>
@@ -89,7 +89,7 @@ export default function AdminUsagePage() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPI label="Créditos cobrados" value={data.totals.total_credits.toLocaleString("pt-BR")} icon={Zap} color="var(--green)" />
-        <KPI label="Custo bruto Uniq (USD)" value={`$${totalCostUSD}`} icon={DollarSign} color="#60a5fa" />
+        <KPI label="Custo bruto  Qchat (USD)" value={`$${totalCostUSD}`} icon={DollarSign} color="#60a5fa" />
         <KPI label="Receita estimada" value={`R$ ${totalRevenueR$}`} icon={TrendingUp} color="#a78bfa"
           hint="1k créditos = R$ 5,00 (config padrão)" />
         <KPI label="Margem (USD)" value={`$${marginUSD}`} icon={TrendingUp} color="#f59e0b" />
@@ -122,8 +122,8 @@ export default function AdminUsagePage() {
             <AreaChart data={tsData}>
               <defs>
                 <linearGradient id="g-credits" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00d46a" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#00d46a" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#2563EB" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#2563EB" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--input)" vertical={false} />
@@ -133,7 +133,7 @@ export default function AdminUsagePage() {
                 contentStyle={{ background: "hsl(240 18% 6.5%)", border: "1px solid var(--surface-border)", borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: "var(--text-2)" }}
               />
-              <Area type="monotone" dataKey="Créditos" stroke="#00d46a" strokeWidth={2} fill="url(#g-credits)" />
+              <Area type="monotone" dataKey="Créditos" stroke="#2563EB" strokeWidth={2} fill="url(#g-credits)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -176,7 +176,7 @@ export default function AdminUsagePage() {
       <div className="rounded-2xl p-4"
         style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
         <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>
-          Custo Uniq por provider
+          Custo  Qchat por provider
         </h3>
         {data.by_provider.length === 0 ? (
           <p className="text-xs py-4 text-center" style={{ color: "var(--text-3)" }}>

@@ -15,7 +15,7 @@ type WebChatConfig struct {
 	WorkspaceID            uuid.UUID  `gorm:"type:uuid;not null;index" json:"workspace_id"`
 	DisplayName            string     `gorm:"type:varchar(120)" json:"display_name,omitempty"`
 	Greeting               string     `gorm:"type:text" json:"greeting,omitempty"`
-	PrimaryColor           string     `gorm:"type:varchar(20);default:'#00d46a'" json:"primary_color"`
+	PrimaryColor           string     `gorm:"type:varchar(20);default:'#2563EB'" json:"primary_color"`
 	Position               string     `gorm:"type:varchar(30);default:'bottom-right'" json:"position"`
 	AvatarURL              string     `gorm:"type:varchar(512)" json:"avatar_url,omitempty"`
 	WhatsappRedirectNumber string     `gorm:"type:varchar(30)" json:"whatsapp_redirect_number,omitempty"`
@@ -52,7 +52,7 @@ func (w *WebChatConfig) BeforeCreate(tx *gorm.DB) error {
 		w.ID = uuid.New()
 	}
 	if w.PrimaryColor == "" {
-		w.PrimaryColor = "#00d46a"
+		w.PrimaryColor = "#2563EB"
 	}
 	if w.Position == "" {
 		w.Position = "bottom-right"

@@ -1656,7 +1656,7 @@ func (e *JourneyExecutor) applyAddTag(ctx *execCtx, name, color string) error {
 	}
 	wsID := contactWorkspace(contact)
 	if color == "" {
-		color = "#00d46a"
+		color = "#2563EB"
 	}
 	var tag models.Tag
 	wsPtr := &wsID

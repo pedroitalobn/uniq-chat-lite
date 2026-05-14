@@ -34,7 +34,7 @@ function Field({
       <div className="relative">
         {icon && (
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ color: focused ? "#00d46a" : "hsl(240 8% 36%)", transition: "color 0.15s" }}>
+            style={{ color: focused ? "#2563EB" : "hsl(240 8% 36%)", transition: "color 0.15s" }}>
             {icon}
           </span>
         )}
@@ -55,10 +55,10 @@ function Field({
             border: error
               ? "1px solid rgba(239,68,68,0.4)"
               : focused
-                ? "1px solid rgba(0,212,106,0.5)"
+                ? "1px solid rgba(37, 99, 235,0.5)"
                 : "1px solid var(--border-default)",
             boxShadow: focused
-              ? error ? "0 0 0 3px rgba(239,68,68,0.08)" : "0 0 0 3px rgba(0,212,106,0.08)"
+              ? error ? "0 0 0 3px rgba(239,68,68,0.08)" : "0 0 0 3px rgba(37, 99, 235,0.08)"
               : "none",
           }}
         />
@@ -200,7 +200,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           autoComplete="current-password" />
         <div className="flex justify-end">
           <Link href="/forgot-password"
-            className="text-xs transition-colors text-[hsl(240_8%_42%)] hover:text-[#00d46a]">
+            className="text-xs transition-colors text-[hsl(240_8%_42%)] hover:text-[#2563EB]">
             Esqueceu a senha?
           </Link>
         </div>
@@ -219,9 +219,9 @@ function GreenBtn({ children, disabled, loading }: {
   return (
     <button type="submit" disabled={disabled}
       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-      style={{ background: "#00d46a", color: "#050508" }}
+      style={{ background: "#2563EB", color: "#050508" }}
       onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
-      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}>
+      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#2563EB"}>
       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
         <>{children}<ArrowRight className="w-4 h-4" /></>
       )}
@@ -249,7 +249,7 @@ function LoginContent() {
       {/* Background orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute w-[800px] h-[600px] rounded-full -bottom-40 -left-40 blur-3xl"
-          style={{ background: "radial-gradient(circle, rgba(0,212,106,0.055) 0%, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, rgba(37, 99, 235,0.055) 0%, transparent 70%)" }} />
         <div className="absolute w-[600px] h-[500px] rounded-full -top-32 -right-32 blur-3xl"
           style={{ background: "radial-gradient(circle, rgba(96,165,250,0.04) 0%, transparent 65%)" }} />
         <div className="absolute w-[400px] h-[400px] rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl"
@@ -280,7 +280,7 @@ function LoginContent() {
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
             border: "1px solid var(--border-default)",
-            boxShadow: "0 0 0 1px var(--input) inset, 0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,106,0.04)",
+            boxShadow: "0 0 0 1px var(--input) inset, 0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(37, 99, 235,0.04)",
           }}
         >
           {/* Card header */}
@@ -330,7 +330,7 @@ function LoginContent() {
             {/* Register link */}
             <p className="text-center text-xs text-[hsl(240_8%_38%)]">
               Não tem conta?{" "}
-              <Link href="/register" className="font-medium transition-colors text-[hsl(240_8%_58%)] hover:text-[#00d46a]">
+              <Link href="/register" className="font-medium transition-colors text-[hsl(240_8%_58%)] hover:text-[#2563EB]">
                 Criar conta grátis
               </Link>
             </p>

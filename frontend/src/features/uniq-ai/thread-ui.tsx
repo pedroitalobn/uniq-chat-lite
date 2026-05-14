@@ -36,7 +36,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { cn } from "@/lib/utils";
 
 // ─── Thinking dots ────────────────────────────────────────────────────────────
@@ -70,10 +70,10 @@ export function ThinkingMessage({ phase }: { phase: string }) {
         className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-2 ring-green-500/30"
         style={{ background: "var(--green)" }}
       >
-        <UniqAIBrandMark className="w-4 h-4" stroke="white" />
+        <QChatAIBrandMark className="w-4 h-4" stroke="white" />
       </div>
       <div className="flex-1 min-w-0 space-y-2">
-        <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>Uniq AI</p>
+        <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>QChat AI</p>
         <ThinkingDots />
         <motion.p
           key={phase}
@@ -331,11 +331,11 @@ export function UserMessage() {
         <div
           className="rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.16) 0%, rgba(0,212,106,0.07) 100%)",
-            border: "1px solid rgba(0,212,106,0.22)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235,0.16) 0%, rgba(37, 99, 235,0.07) 100%)",
+            border: "1px solid rgba(37, 99, 235,0.22)",
             backdropFilter: "blur(20px) saturate(160%)",
             WebkitBackdropFilter: "blur(20px) saturate(160%)",
-            boxShadow: "0 4px 20px rgba(0,212,106,0.08), inset 0 1px 0 var(--border-subtle)",
+            boxShadow: "0 4px 20px rgba(37, 99, 235,0.08), inset 0 1px 0 var(--border-subtle)",
             color: "var(--text-1)",
           }}
         >
@@ -379,13 +379,13 @@ export function AssistantMessage() {
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-1 ring-green-500/25"
           style={{
-            background: "linear-gradient(135deg, var(--green) 0%, rgba(0,212,106,0.7) 100%)",
+            background: "linear-gradient(135deg, var(--green) 0%, rgba(37, 99, 235,0.7) 100%)",
           }}
         >
-        <UniqAIBrandMark className="w-4 h-4" stroke="white" />
+        <QChatAIBrandMark className="w-4 h-4" stroke="white" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold mb-2" style={{ color: "var(--green)" }}>Uniq AI</p>
+        <p className="text-xs font-semibold mb-2" style={{ color: "var(--green)" }}>QChat AI</p>
         <div className="prose prose-invert max-w-none">
           <MessagePrimitive.Parts
             components={{
@@ -418,18 +418,18 @@ export function RunningMessage({ phase }: { phase: string }) {
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
           style={{
-            background: "linear-gradient(135deg, var(--green) 0%, rgba(0,212,106,0.7) 100%)",
+            background: "linear-gradient(135deg, var(--green) 0%, rgba(37, 99, 235,0.7) 100%)",
           }}
         >
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           >
-            <UniqAIBrandMark className="w-4 h-4" stroke="white" />
+            <QChatAIBrandMark className="w-4 h-4" stroke="white" />
           </motion.div>
         </div>
         <div className="flex-1 min-w-0 space-y-1.5">
-          <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>Uniq AI</p>
+          <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>QChat AI</p>
           <ThinkingDots />
           <motion.p
             key={phase}
@@ -664,7 +664,7 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
       <motion.div className="absolute rounded-full"
         style={{
           width: size * 2.2, height: size * 2.2,
-          background: "radial-gradient(circle, rgba(0,212,106,0.10) 0%, rgba(0,180,90,0.04) 50%, transparent 75%)",
+          background: "radial-gradient(circle, rgba(37, 99, 235,0.10) 0%, rgba(0,180,90,0.04) 50%, transparent 75%)",
         }}
         animate={{ scale: [1, 1.18, 1], opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
@@ -673,9 +673,9 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
       <motion.div className="absolute rounded-full"
         style={{
           width: size * 1.7, height: size * 1.7,
-          background: "radial-gradient(circle, rgba(0,212,106,0.16) 0%, transparent 65%)",
-          border: "1px solid rgba(0,212,106,0.12)",
-          boxShadow: "0 0 60px rgba(0,212,106,0.14)",
+          background: "radial-gradient(circle, rgba(37, 99, 235,0.16) 0%, transparent 65%)",
+          border: "1px solid rgba(37, 99, 235,0.12)",
+          boxShadow: "0 0 60px rgba(37, 99, 235,0.14)",
         }}
         animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }} />
@@ -684,8 +684,8 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
       <motion.div className="absolute rounded-full"
         style={{
           width: size * 1.22, height: size * 1.22,
-          border: "1.5px solid rgba(0,212,106,0.35)",
-          boxShadow: "0 0 32px rgba(0,212,106,0.22), inset 0 0 24px rgba(0,212,106,0.06)",
+          border: "1.5px solid rgba(37, 99, 235,0.35)",
+          boxShadow: "0 0 32px rgba(37, 99, 235,0.22), inset 0 0 24px rgba(37, 99, 235,0.06)",
         }}
         animate={{ scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
         transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
@@ -699,7 +699,7 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
           <div className="w-2 h-2 rounded-full"
-            style={{ background: "#00d46a", boxShadow: "0 0 8px rgba(0,212,106,0.9), 0 0 20px rgba(0,212,106,0.5)" }} />
+            style={{ background: "#2563EB", boxShadow: "0 0 8px rgba(37, 99, 235,0.9), 0 0 20px rgba(37, 99, 235,0.5)" }} />
         </div>
       </motion.div>
 
@@ -712,7 +712,7 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
           <div className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "#00d46a", opacity: 0.6, boxShadow: "0 0 6px rgba(0,212,106,0.8)" }} />
+            style={{ background: "#2563EB", opacity: 0.6, boxShadow: "0 0 6px rgba(37, 99, 235,0.8)" }} />
         </div>
       </motion.div>
 
@@ -721,16 +721,16 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
         className="relative rounded-full overflow-hidden"
         style={{
           width: size, height: size,
-          background: "radial-gradient(circle at 32% 32%, rgba(0,255,140,0.55) 0%, rgba(0,212,106,0.35) 35%, rgba(0,60,30,0.95) 100%)",
-          boxShadow: "0 0 48px rgba(0,212,106,0.45), 0 0 120px rgba(0,212,106,0.18), inset 0 0 32px rgba(0,212,106,0.15)",
-          border: "1.5px solid rgba(0,212,106,0.45)",
+          background: "radial-gradient(circle at 32% 32%, rgba(0,255,140,0.55) 0%, rgba(37, 99, 235,0.35) 35%, rgba(0,60,30,0.95) 100%)",
+          boxShadow: "0 0 48px rgba(37, 99, 235,0.45), 0 0 120px rgba(37, 99, 235,0.18), inset 0 0 32px rgba(37, 99, 235,0.15)",
+          border: "1.5px solid rgba(37, 99, 235,0.45)",
         }}
         animate={{ scale: [1, 1.03, 1] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
       >
         {/* Rotating highlight */}
         <motion.div className="absolute inset-0 rounded-full"
-          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.22) 0%, transparent 45%, rgba(0,212,106,0.12) 100%)" }}
+          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.22) 0%, transparent 45%, rgba(37, 99, 235,0.12) 100%)" }}
           animate={{ rotate: [0, 360] }}
           transition={{ duration: 8, repeat: Infinity, ease: "linear" }} />
 
@@ -740,11 +740,11 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
             animate={{ scale: [0.85, 1.12, 0.85], opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <UniqAIBrandMark
+            <QChatAIBrandMark
               className="w-8 h-8"
               stroke="var(--text-1)"
               glow
-              style={{ filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }}
+              style={{ filter: "drop-shadow(0 0 8px rgba(37, 99, 235,0.8))" }}
             />
           </motion.div>
         </div>
@@ -763,7 +763,7 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: "radial-gradient(circle, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 38%, transparent 72%)",
+              background: "radial-gradient(circle, rgba(37, 99, 235,0.12) 0%, rgba(37, 99, 235,0.05) 38%, transparent 72%)",
               filter: "blur(12px)",
               transform: "scale(1.12)",
             }}
@@ -773,7 +773,7 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
             className="absolute inset-[10%] rounded-full"
             style={{
               border: "1px solid rgba(255,255,255,0.05)",
-              boxShadow: "0 0 80px rgba(0,212,106,0.08), inset 0 0 50px rgba(0,212,106,0.04)",
+              boxShadow: "0 0 80px rgba(37, 99, 235,0.08), inset 0 0 50px rgba(37, 99, 235,0.04)",
             }}
             animate={{ rotate: [0, 360] }}
             transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
@@ -815,8 +815,8 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
               left: ORBIT_CENTER - 4,
               width: 8, height: 8,
               borderRadius: "50%",
-              background: "#00d46a",
-              boxShadow: "0 0 10px rgba(0,212,106,0.9), 0 0 24px rgba(0,212,106,0.5)",
+              background: "#2563EB",
+              boxShadow: "0 0 10px rgba(37, 99, 235,0.9), 0 0 24px rgba(37, 99, 235,0.5)",
             }} />
           </motion.div>
 
@@ -833,8 +833,8 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
               left: ORBIT_CENTER - 3,
               width: 6, height: 6,
               borderRadius: "50%",
-              background: "rgba(0,212,106,0.6)",
-              boxShadow: "0 0 8px rgba(0,212,106,0.7)",
+              background: "rgba(37, 99, 235,0.6)",
+              boxShadow: "0 0 8px rgba(37, 99, 235,0.7)",
             }} />
           </motion.div>
 
@@ -842,7 +842,7 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
             className="absolute left-1/2 top-8 -translate-x-1/2 rounded-full px-3 py-1"
             style={{
               background: "linear-gradient(180deg, rgba(10,14,22,0.95) 0%, rgba(6,8,14,0.92) 100%)",
-              border: "1px solid rgba(0,212,106,0.18)",
+              border: "1px solid rgba(37, 99, 235,0.18)",
               boxShadow: "0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.06)",
               backdropFilter: "blur(18px)",
             }}
@@ -921,8 +921,8 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
           </div>
           <h2 className="text-xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
             Olá, sou a{" "}
-            <span style={{ color: "var(--green)", textShadow: "0 0 20px rgba(0,212,106,0.5)" }}>
-              Uniq AI
+            <span style={{ color: "var(--green)", textShadow: "0 0 20px rgba(37, 99, 235,0.5)" }}>
+              QChat AI
             </span>
           </h2>
           <p className="text-sm max-w-md mx-auto leading-relaxed" style={{ color: "var(--text-3)" }}>

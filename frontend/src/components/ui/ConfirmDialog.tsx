@@ -32,7 +32,7 @@ export function ConfirmDialog({
     return () => window.removeEventListener("keydown", handler);
   }, [onCancel, onConfirm]);
 
-  const bg = variant === "danger" ? "#ef4444" : "#00d46a";
+  const bg = variant === "danger" ? "#ef4444" : "#2563EB";
   const fg = variant === "danger" ? "white" : "#03170a";
 
   return (
@@ -91,7 +91,7 @@ export function ConfirmDialog({
             borderRadius: "50%",
             background: variant === "danger"
               ? "radial-gradient(circle, rgba(239,68,68,0.18) 0%, transparent 70%)"
-              : "radial-gradient(circle, rgba(0,212,106,0.15) 0%, transparent 70%)",
+              : "radial-gradient(circle, rgba(37, 99, 235,0.15) 0%, transparent 70%)",
             filter: "blur(30px)",
             pointerEvents: "none",
           }} />

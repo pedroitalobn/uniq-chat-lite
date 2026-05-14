@@ -12,7 +12,7 @@ type Props = {
 };
 
 // Inteligência — escolha do provedor LLM e modelo. Quando vazio, cai
-// na Uniq AI (provider default da plataforma) e o modelo é auto-
+// na QChat AI (provider default da plataforma) e o modelo é auto-
 // resolvido pelo backend. Provider custom exige modelo explícito.
 export function IntelligenceCard({ form, update }: Props) {
   const integrationsQuery = useQuery({
@@ -23,7 +23,7 @@ export function IntelligenceCard({ form, update }: Props) {
   const integrations = (integrationsQuery.data || []).filter(
     (i: any) => i.type === "ai" || i.kind === "ai" || i.category === "ai" || !i.type,
   );
-  const usingUniqAI = !form.integration_id;
+  const usingQChatAI = !form.integration_id;
   const selected = integrations.find((i: any) => i.id === form.integration_id);
 
   return (
@@ -40,27 +40,27 @@ export function IntelligenceCard({ form, update }: Props) {
             border: "1px solid rgba(99,102,241,0.20)",
           }}
         >
-          {usingUniqAI ? "Uniq AI" : selected?.name || "Custom"}
+          {usingQChatAI ? "QChat AI" : selected?.name || "Custom"}
         </span>
       }
     >
       <div className="space-y-3 pt-3">
-        {/* Uniq AI default */}
+        {/* QChat AI default */}
         <button
           type="button"
           onClick={() => update((p) => ({ ...p, integration_id: "", model: "" }))}
           className="w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all"
           style={{
-            background: usingUniqAI ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
-            border: `1px solid ${usingUniqAI ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+            background: usingQChatAI ? "rgba(37, 99, 235,0.06)" : "var(--surface-2)",
+            border: `1px solid ${usingQChatAI ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
           }}
         >
           <span
             className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0"
             style={{
-              background: usingUniqAI ? "rgba(0,212,106,0.12)" : "var(--input)",
-              border: `1px solid ${usingUniqAI ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
-              color: usingUniqAI ? "var(--green)" : "var(--text-3)",
+              background: usingQChatAI ? "rgba(37, 99, 235,0.12)" : "var(--input)",
+              border: `1px solid ${usingQChatAI ? "rgba(37, 99, 235,0.25)" : "var(--border-subtle)"}`,
+              color: usingQChatAI ? "var(--green)" : "var(--text-3)",
             }}
           >
             <Sparkles className="w-4 h-4" />
@@ -68,11 +68,11 @@ export function IntelligenceCard({ form, update }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-                Uniq AI
+                QChat AI
               </span>
               <span
                 className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)" }}
+                style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)" }}
               >
                 recomendado
               </span>
@@ -93,14 +93,14 @@ export function IntelligenceCard({ form, update }: Props) {
             onChange={(e) => update((p) => ({ ...p, integration_id: e.target.value }))}
             style={selectStyle}
           >
-            <option value="">— Sem provedor custom (usa Uniq AI) —</option>
+            <option value="">— Sem provedor custom (usa QChat AI) —</option>
             {integrations.map((i: any) => (
               <option key={i.id} value={i.id}>
                 {i.name || i.provider || i.id}
               </option>
             ))}
           </select>
-          {!usingUniqAI && (
+          {!usingQChatAI && (
             <div className="mt-2">
               <label className="block text-[11px] font-medium mb-1" style={{ color: "var(--text-2)" }}>
                 Modelo

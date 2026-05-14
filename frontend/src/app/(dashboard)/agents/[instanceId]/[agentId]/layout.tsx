@@ -106,8 +106,8 @@ function Inner({ children }: { children: React.ReactNode }) {
             onClick={() => setPreviewOpen(true)}
             className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1.5 rounded-lg transition-colors"
             style={{
-              background: previewOpen ? "rgba(0,212,106,0.12)" : "var(--surface-2)",
-              border: `1px solid ${previewOpen ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+              background: previewOpen ? "rgba(37, 99, 235,0.12)" : "var(--surface-2)",
+              border: `1px solid ${previewOpen ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
               color: previewOpen ? "var(--green)" : "var(--text-2)",
             }}
             title="Testar agente (preview ao vivo, sem persistir)"
@@ -128,8 +128,8 @@ function Inner({ children }: { children: React.ReactNode }) {
             style={
               active
                 ? {
-                    background: "rgba(0,212,106,0.12)",
-                    border: "1px solid rgba(0,212,106,0.30)",
+                    background: "rgba(37, 99, 235,0.12)",
+                    border: "1px solid rgba(37, 99, 235,0.30)",
                     color: "var(--green)",
                   }
                 : {

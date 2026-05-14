@@ -10,7 +10,7 @@ import { useEffect, useRef } from "react";
 // do html. São separados do CSS pra poder animar via JS.
 const ORBS = [
   // { color, opacity, size, baseX%, baseY%, intensity (0-1) }
-  { color: "0,212,106",  opacity: 0.12, size: 600, x: 15, y: 8,   intensity: 0.025 },
+  { color: "37,99,235",  opacity: 0.12, size: 600, x: 15, y: 8,   intensity: 0.025 },
   { color: "99,102,241", opacity: 0.09, size: 500, x: 85, y: 5,   intensity: -0.018 },
   { color: "139,92,246", opacity: 0.07, size: 450, x: 5,  y: 55,  intensity: 0.02  },
   { color: "59,130,246", opacity: 0.06, size: 480, x: 92, y: 50,  intensity: -0.015 },

@@ -427,7 +427,7 @@ func (h *BillingHandler) upgradeAsaas(c *fiber.Ctx, user *models.User, newPlan *
 	newPrice := newPlan.Price
 	_, err = h.asaas.UpdateSubscription(user.AsaasSubscriptionID, services.AsaasSubscriptionUpdate{
 		Value:       &newPrice,
-		Description: fmt.Sprintf("Plano %s — Uniq Chat", newPlan.Name),
+		Description: fmt.Sprintf("Plano %s — Qchat", newPlan.Name),
 	})
 	if err != nil {
 		log.Error().Err(err).Str("sub", user.AsaasSubscriptionID).Msg("billing/asaas: update sub failed")

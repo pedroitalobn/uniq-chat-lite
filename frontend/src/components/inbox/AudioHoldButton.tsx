@@ -177,11 +177,11 @@ export function AudioHoldButton({
           height: size,
           background: willCancel
             ? "rgba(239,68,68,0.18)"
-            : locked ? "rgba(0,212,106,0.12)" : "rgba(239,68,68,0.10)",
+            : locked ? "rgba(37, 99, 235,0.12)" : "rgba(239,68,68,0.10)",
           border: `1px solid ${
             willCancel
               ? "rgba(239,68,68,0.55)"
-              : locked ? "rgba(0,212,106,0.35)" : "rgba(239,68,68,0.30)"
+              : locked ? "rgba(37, 99, 235,0.35)" : "rgba(239,68,68,0.30)"
           }`,
         }}
         // touchmove/end aqui também — em alguns devices o touchend dispara no
@@ -201,7 +201,7 @@ export function AudioHoldButton({
         </span>
         <span
           className="flex-1 text-xs truncate text-right"
-          style={{ color: willCancel ? "#ef4444" : locked ? "#00d46a" : "var(--text-3)" }}
+          style={{ color: willCancel ? "#ef4444" : locked ? "#2563EB" : "var(--text-3)" }}
         >
           {willCancel ? "Solte para cancelar" : locked ? "Gravando livre" : "← cancelar · ↑ travar"}
         </span>
@@ -259,7 +259,7 @@ export function AudioHoldButton({
         height: size,
         background: "var(--green)",
         color: "var(--green-fg, #03170a)",
-        boxShadow: "0 2px 8px rgba(0,212,106,0.25)",
+        boxShadow: "0 2px 8px rgba(37, 99, 235,0.25)",
         touchAction: "none",
       }}
     >

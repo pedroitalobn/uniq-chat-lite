@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const CAT_COLOR: Record<string, string> = {
   ai: "#a78bfa",
   voice: "#f59e0b",
-  message: "#00d46a",
+  message: "#2563EB",
 };
 
 const CAT_LABEL_SHORT: Record<string, string> = {
@@ -31,7 +31,7 @@ function levelColor(pct: number) {
   if (pct >= 100) return "#ef4444";
   if (pct >= 80) return "#f59e0b";
   if (pct >= 60) return "#fbbf24";
-  return "#00d46a";
+  return "#2563EB";
 }
 
 export function UsageBanner({ collapsed }: { collapsed: boolean }) {

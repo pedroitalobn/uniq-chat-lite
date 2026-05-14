@@ -30,7 +30,7 @@ import { CreateInstanceModal } from "@/components/instances/CreateInstanceModal"
 import { useInstanceStatus } from "@/contexts/WebSocketContext";
 
 const STATUS_MAP: Record<string, { label: string; cls: string; dotColor: string }> = {
-  connected:    { label: "Conectado",    cls: "status-connected",    dotColor: "#00d46a" },
+  connected:    { label: "Conectado",    cls: "status-connected",    dotColor: "#2563EB" },
   connecting:   { label: "Conectando",   cls: "status-connecting",   dotColor: "#f59e0b" },
   disconnected: { label: "Desconectado", cls: "status-disconnected", dotColor: "#64748b" },
   banned:       { label: "Banido",       cls: "status-banned",       dotColor: "#ef4444" },
@@ -79,7 +79,7 @@ function MiniSparkline({ base, color, instanceId }: { base: number; color: strin
 
 function SignalBars({ status }: { status: string }) {
   const strength = status === "connected" ? 3 : status === "connecting" ? 1 : 0;
-  const color = status === "connected" ? "#00d46a" : status === "connecting" ? "#f59e0b" : "#475569";
+  const color = status === "connected" ? "#2563EB" : status === "connecting" ? "#f59e0b" : "#475569";
   const bars = [
     { height: 6, delay: "0ms" },
     { height: 10, delay: "150ms" },
@@ -108,7 +108,7 @@ function StatusRing({ status, children }: { status: string; children: React.Reac
   const isConnected = status === "connected";
   const isConnecting = status === "connecting";
   const isBanned = status === "banned";
-  const color = isConnected ? "#00d46a" : isConnecting ? "#f59e0b" : isBanned ? "#ef4444" : "#334155";
+  const color = isConnected ? "#2563EB" : isConnecting ? "#f59e0b" : isBanned ? "#ef4444" : "#334155";
   const size = 52;
   const r = 23;
   const circ = 2 * Math.PI * r;
@@ -172,8 +172,8 @@ function StatusRing({ status, children }: { status: string; children: React.Reac
       {/* Inner content */}
       <div className="absolute inset-2 rounded-full flex items-center justify-center"
         style={{
-          background: isConnected ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
-          border: `1px solid ${isConnected ? "rgba(0,212,106,0.20)" : "var(--border-default)"}`,
+          background: isConnected ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
+          border: `1px solid ${isConnected ? "rgba(37, 99, 235,0.20)" : "var(--border-default)"}`,
         }}>
         {children}
       </div>
@@ -259,17 +259,17 @@ function InstanceCard({
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
         border: isConnected
-          ? "1px solid rgba(0,212,106,0.22)"
+          ? "1px solid rgba(37, 99, 235,0.22)"
           : isReconnecting
             ? "1px solid rgba(245,158,11,0.22)"
             : "1px solid var(--border-default)",
         borderRadius: "20px",
         boxShadow: hovered
           ? isConnected
-            ? "0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,212,106,0.12), inset 0 1px 0 var(--border-strong)"
+            ? "0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(37, 99, 235,0.12), inset 0 1px 0 var(--border-strong)"
             : "0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 var(--border-strong)"
           : isConnected
-            ? "0 0 0 1px rgba(0,212,106,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)"
+            ? "0 0 0 1px rgba(37, 99, 235,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)"
             : "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
         animationDelay: `${index * 60}ms`,
         animationFillMode: "both",
@@ -283,7 +283,7 @@ function InstanceCard({
       <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
         style={{
           background: isConnected
-            ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.45), transparent)"
+            ? "linear-gradient(90deg, transparent, rgba(37, 99, 235,0.45), transparent)"
             : isReconnecting
               ? "linear-gradient(90deg, transparent, rgba(245,158,11,0.35), transparent)"
               : "linear-gradient(90deg, transparent, var(--border-default), transparent)"
@@ -312,7 +312,7 @@ function InstanceCard({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               ) : (
                 <>
-                  <Smartphone className="w-4 h-4" style={{ color: isConnected ? "#00d46a" : "#64748b" }} />
+                  <Smartphone className="w-4 h-4" style={{ color: isConnected ? "#2563EB" : "#64748b" }} />
                   {instance.proxy_mode === "residencial" && instance.proxy_status === "ok" && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
                       style={{ background: "#a855f7" }}>
@@ -329,7 +329,7 @@ function InstanceCard({
                 {instance.name}
               </h3>
               {(profile?.phone_number || profile?.identifier) && (
-                <p className="text-xs mt-0.5 font-medium" style={{ color: "#00d46a" }}>
+                <p className="text-xs mt-0.5 font-medium" style={{ color: "#2563EB" }}>
                   {profile.identifier ? `@${profile.identifier}` : profile.phone_number}
                 </p>
               )}
@@ -339,7 +339,7 @@ function InstanceCard({
                   {instance.id}
                 </code>
                 {idCopied
-                  ? <Check className="w-3 h-3 flex-shrink-0" style={{ color: "#00d46a" }} />
+                  ? <Check className="w-3 h-3 flex-shrink-0" style={{ color: "#2563EB" }} />
                   : <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "var(--text-4)" }} />
                 }
               </button>
@@ -364,7 +364,7 @@ function InstanceCard({
         {isConnected && uptime && (
           <div className="flex items-center gap-2 -mt-1">
             <div className="flex items-center gap-1.5">
-              <Zap className="w-2.5 h-2.5" style={{ color: "#00d46a", opacity: 0.7 }} />
+              <Zap className="w-2.5 h-2.5" style={{ color: "#2563EB", opacity: 0.7 }} />
               <span className="text-[10px] font-mono" style={{ color: "hsl(240 8% 42%)" }}>
                 uptime {uptime}
               </span>
@@ -408,9 +408,9 @@ function InstanceCard({
           )}
           {instance.use_global_proxy && instance.proxy_status === "ok" && (
             <span className="status-badge" style={{
-              background: "rgba(0,212,106,0.08)",
-              color: "#00d46a",
-              borderColor: "rgba(0,212,106,0.18)",
+              background: "rgba(37, 99, 235,0.08)",
+              color: "#2563EB",
+              borderColor: "rgba(37, 99, 235,0.18)",
               borderRadius: "10px",
             }}>
               <Globe className="w-3 h-3" />
@@ -511,12 +511,12 @@ function InstanceCard({
               onClick={() => onQR(instance.id)}
               className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 rounded-xl transition-all duration-150"
               style={{
-                background: "rgba(0,212,106,0.08)",
-                border: "1px solid rgba(0,212,106,0.15)",
-                color: "#00d46a",
+                background: "rgba(37, 99, 235,0.08)",
+                border: "1px solid rgba(37, 99, 235,0.15)",
+                color: "#2563EB",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.14)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.08)")}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(37, 99, 235,0.14)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "rgba(37, 99, 235,0.08)")}
             >
               <QrCode className="w-3.5 h-3.5" />
               QR
@@ -564,7 +564,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
   if (total === 0) return null;
 
   const pct = Math.round((connected / total) * 100);
-  const healthColor = pct === 100 ? "#00d46a" : pct >= 50 ? "#f59e0b" : "#ef4444";
+  const healthColor = pct === 100 ? "#2563EB" : pct >= 50 ? "#f59e0b" : "#ef4444";
 
   return (
     <div className="rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
@@ -603,7 +603,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
       {/* Stats */}
       <div className="flex items-center gap-6 flex-wrap">
         {[
-          { count: connected, label: "Online", color: "#00d46a" },
+          { count: connected, label: "Online", color: "#2563EB" },
           { count: connecting + reconnectingIds.size, label: "Conectando", color: "#f59e0b" },
           { count: disconnected, label: "Offline", color: "#64748b" },
           { count: banned, label: "Banido", color: "#ef4444" },
@@ -731,15 +731,15 @@ function InstancesContent() {
             onClick={() => setCreateOpen(true)}
             className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap flex-1 sm:flex-none"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
-              color: "#00d46a",
+              border: "1px solid rgba(37, 99, 235,0.30)",
+              boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
+              color: "#2563EB",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.28), rgba(37, 99, 235,0.12))"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))"; }}
           >
             <Plus className="w-4 h-4" />
             {t("instances_new")}
@@ -857,15 +857,15 @@ function InstancesContent() {
             onClick={() => setCreateOpen(true)}
             className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
-              color: "#00d46a",
+              border: "1px solid rgba(37, 99, 235,0.30)",
+              boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
+              color: "#2563EB",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.28), rgba(37, 99, 235,0.12))"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))"; }}
           >
             <Plus className="w-4 h-4" />
             Criar primeira instância

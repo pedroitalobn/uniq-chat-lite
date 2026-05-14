@@ -1,6 +1,6 @@
 "use client";
 
-// PlatformVoicePanel — gestão de providers globais de TTS (Uniq Voice).
+// PlatformVoicePanel — gestão de providers globais de TTS (Qchat Voice).
 // Espelha o pattern do PlatformAIPanel mas pra voz. Workspaces que têm
 // allow_voice no plano e nenhum VoiceProvider próprio caem aqui.
 //
@@ -23,7 +23,7 @@ const PROVIDERS = [
 
 type Form = Partial<PlatformVoiceConfig> & { api_key?: string };
 
-const empty = (): Form => ({ provider: "openai_tts", name: "Uniq Voice", is_active: true });
+const empty = (): Form => ({ provider: "openai_tts", name: "Qchat Voice", is_active: true });
 
 export function PlatformVoicePanel() {
   const qc = useQueryClient();
@@ -93,7 +93,7 @@ export function PlatformVoicePanel() {
           <Mic2 className="w-4 h-4" style={{ color: "#f59e0b" }} />
         </div>
         <div className="flex-1">
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Uniq Voice</h2>
+          <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Qchat Voice</h2>
           <p className="text-xs" style={{ color: "var(--text-3)" }}>
             Provedores TTS globais — disponíveis pra workspaces com allow_voice no plano
           </p>
@@ -116,7 +116,7 @@ export function PlatformVoicePanel() {
           <Mic2 className="w-8 h-8 mx-auto mb-2 opacity-40" style={{ color: "var(--text-3)" }} />
           <p className="text-sm" style={{ color: "var(--text-2)" }}>Nenhum provider configurado</p>
           <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-            Adicione OpenAI TTS, ElevenLabs ou outro pra ativar Uniq Voice
+            Adicione OpenAI TTS, ElevenLabs ou outro pra ativar Qchat Voice
           </p>
         </div>
       ) : (
@@ -132,15 +132,15 @@ export function PlatformVoicePanel() {
                     <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{c.name || meta?.label}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                       style={{
-                        background: c.is_active ? "rgba(0,212,106,0.12)" : "var(--input)",
+                        background: c.is_active ? "rgba(37, 99, 235,0.12)" : "var(--input)",
                         color: c.is_active ? "var(--green)" : "var(--text-3)",
-                        border: `1px solid ${c.is_active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                        border: `1px solid ${c.is_active ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                       }}>
                       {c.is_active ? "Ativo" : "Inativo"}
                     </span>
                     {c.test_status === "ok" && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full"
-                        style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)" }}>✓ testado</span>
+                        style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)" }}>✓ testado</span>
                     )}
                     {c.test_status === "failed" && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full"
@@ -197,7 +197,7 @@ export function PlatformVoicePanel() {
             style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
             onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-              {isNew ? "Novo provider Uniq Voice" : "Editar provider"}
+              {isNew ? "Novo provider Qchat Voice" : "Editar provider"}
             </h3>
 
             <Field label="Provider">
@@ -219,7 +219,7 @@ export function PlatformVoicePanel() {
               <input
                 value={form.name || ""}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Uniq Voice"
+                placeholder="Qchat Voice"
                 className="input-field w-full text-sm"
               />
             </Field>

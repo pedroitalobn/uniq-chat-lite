@@ -1,6 +1,6 @@
 "use client";
 
-// Preferência de modelo do Uniq AI — persiste em localStorage para
+// Preferência de modelo do QChat AI — persiste em localStorage para
 // sobreviver a recargas e ser compartilhada entre chat-panel e Dynamic Island.
 
 const PREF_KEY = "uniqai_model_pref";

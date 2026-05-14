@@ -398,7 +398,7 @@ export default function ArticlePage({
     }
   };
 
-  const color = config?.primary_color || "#00d46a";
+  const color = config?.primary_color || "#2563EB";
   const themeMode = config?.theme_mode ?? "dark";
   const fontFamily = FONT_STACKS[config?.font_family ?? "inter"] ?? FONT_STACKS.inter;
   const hideBranding = config?.hide_uniq_branding ?? false;
@@ -634,7 +634,7 @@ export default function ArticlePage({
                     : config.visibility === "password"
                       ? "Esta central de ajuda requer uma senha para acessar."
                       : config.visibility === "uniq_users"
-                        ? "Apenas usuários logados no Uniq têm acesso a esta central."
+                        ? "Apenas usuários logados no  Qchat têm acesso a esta central."
                         : "Apenas membros da workspace têm acesso a esta central."}
                 </p>
               </div>
@@ -843,7 +843,7 @@ export default function ArticlePage({
               rel="noopener noreferrer"
               style={{ color, textDecoration: "none", fontWeight: 600 }}
             >
-              Uniq Chat
+              Qchat
             </a>
           </p>
         </footer>

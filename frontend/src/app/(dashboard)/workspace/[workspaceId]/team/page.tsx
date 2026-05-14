@@ -167,7 +167,7 @@ export default function TeamPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending": return { bg: "rgba(59,130,246,0.1)", color: "#60a5fa" };
-      case "accepted": return { bg: "rgba(0,212,106,0.1)", color: "#4ade80" };
+      case "accepted": return { bg: "rgba(37, 99, 235,0.1)", color: "#4ade80" };
       case "expired": return { bg: "rgba(251,146,60,0.1)", color: "#fb923c" };
       case "revoked": return { bg: "rgba(239,68,68,0.1)", color: "#f87171" };
       default: return { bg: "var(--surface-2)", color: "var(--text-3)" };
@@ -265,7 +265,7 @@ export default function TeamPage() {
               <Link
                 href={`/workspace/${workspaceId}/roles`}
                 className="underline"
-                style={{ color: "#00d46a" }}
+                style={{ color: "#2563EB" }}
               >
                 Criar a primeira função →
               </Link>
@@ -294,10 +294,10 @@ export default function TeamPage() {
           {copiedLink && (
             <div
               className="rounded-xl p-4 space-y-3 animate-fade-in-up"
-              style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.2)" }}
+              style={{ background: "rgba(37, 99, 235,0.05)", border: "1px solid rgba(37, 99, 235,0.2)" }}
             >
               <div className="flex items-center gap-2">
-                <Check className="w-4 h-4" style={{ color: "var(--green, #00d46a)" }} />
+                <Check className="w-4 h-4" style={{ color: "var(--green, #2563EB)" }} />
                 <span className="text-sm font-medium" style={{ color: "#86efac" }}>
                   Convite criado. Link copiado — envie também por onde quiser.
                 </span>
@@ -325,7 +325,7 @@ export default function TeamPage() {
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition-colors"
-                  style={{ background: "rgba(0,212,106,0.1)", color: "#4ade80" }}
+                  style={{ background: "rgba(37, 99, 235,0.1)", color: "#4ade80" }}
                 >
                   WhatsApp
                 </a>
@@ -504,8 +504,8 @@ export default function TeamPage() {
                     title="Copiar link de convite"
                     className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
                     style={{
-                      background: copiedInviteId === invite.id ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
-                      border: `1px solid ${copiedInviteId === invite.id ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
+                      background: copiedInviteId === invite.id ? "rgba(37, 99, 235,0.1)" : "var(--surface-2)",
+                      border: `1px solid ${copiedInviteId === invite.id ? "rgba(37, 99, 235,0.25)" : "var(--border-default)"}`,
                       color: copiedInviteId === invite.id ? "#4ade80" : "hsl(240 8% 65%)",
                     }}
                   >

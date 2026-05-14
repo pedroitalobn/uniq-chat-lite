@@ -89,7 +89,7 @@ export function ContactInboxCTA({
         onClick={onClick}
         className={`${padding} rounded-lg transition-all`}
         title={preferredInstanceId ? "Abrir no inbox" : "Falar com o contato no inbox"}
-        style={{ color: "#00d46a", background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)" }}
+        style={{ color: "#2563EB", background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.2)" }}
       >
         <MessageSquare className={iconSize} />
       </button>
@@ -124,7 +124,7 @@ export function ContactInboxCTA({
                 onClick={() => goToConversation(i.id)}
                 className="w-full text-left px-3 py-2 hover:bg-white/5 flex items-center gap-2"
               >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: i.status === "connected" ? "#00d46a" : "#71717a" }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: i.status === "connected" ? "#2563EB" : "#71717a" }} />
                 <span className="text-xs flex-1 truncate" style={{ color: "var(--text-1)" }}>{i.name}</span>
                 {i.channel && <span className="text-[10px]" style={{ color: "var(--text-3)" }}>{i.channel}</span>}
               </button>

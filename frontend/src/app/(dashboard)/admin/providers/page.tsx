@@ -98,7 +98,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#00d46a] transition-colors"
+      className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#2563EB] transition-colors"
       style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-1)" }}
     />
   );
@@ -108,7 +108,7 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#00d46a] transition-colors"
+      className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#2563EB] transition-colors"
       style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-1)" }}
     />
   );
@@ -119,7 +119,7 @@ function SaveBtn({ loading, onClick, label = "Salvar" }: { loading?: boolean; on
     <button
       onClick={onClick}
       disabled={loading}
-      className="inline-flex items-center gap-2 bg-[#00d46a] text-[#050508] font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
+      className="inline-flex items-center gap-2 bg-[#2563EB] text-[#050508] font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
     >
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
       {label}
@@ -130,7 +130,7 @@ function SaveBtn({ loading, onClick, label = "Salvar" }: { loading?: boolean; on
 function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
   return (
     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-      style={{ background: ok ? "rgba(0,212,106,0.12)" : "rgba(251,191,36,0.12)", color: ok ? "#00d46a" : "#fbbf24" }}>
+      style={{ background: ok ? "rgba(37, 99, 235,0.12)" : "rgba(251,191,36,0.12)", color: ok ? "#2563EB" : "#fbbf24" }}>
       {label ?? (ok ? "Configurado" : "Não configurado")}
     </span>
   );
@@ -194,7 +194,7 @@ function PaymentProviderBadge({
   if (testStatus === "ok") {
     return (
       <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-        style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+        style={{ background: "rgba(37, 99, 235,0.12)", color: "#2563EB" }}>
         Conectado
       </span>
     );
@@ -220,13 +220,13 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   { id: "payment",       label: "Pagamento",    icon: CreditCard,    desc: "Stripe, Asaas, AbacatePay" },
   { id: "communication", label: "Comunicação",  icon: Mail,          desc: "Email, templates, OTP" },
   // AI: configura provedores globais (OpenAI, Anthropic, etc.) usados
-  // por todos os módulos da plataforma — Uniq AI chat, transcrição
+  // por todos os módulos da plataforma — QChat AI chat, transcrição
   // Whisper de áudios do inbox, agente de instâncias.
-  { id: "ai",            label: "Uniq AI",      icon: Sparkles,      desc: "Provedores LLM globais (OpenAI, Anthropic, etc.)" },
-  // Voice: TTS gerenciado pela plataforma. Espelha Uniq AI — providers
-  // globais (OpenAI TTS, ElevenLabs, etc.) que viram a "Uniq Voice"
+  { id: "ai",            label: "QChat AI",      icon: Sparkles,      desc: "Provedores LLM globais (OpenAI, Anthropic, etc.)" },
+  // Voice: TTS gerenciado pela plataforma. Espelha QChat AI — providers
+  // globais (OpenAI TTS, ElevenLabs, etc.) que viram a "Qchat Voice"
   // pra workspaces com allow_voice no plano.
-  { id: "voice",         label: "Uniq Voice",   icon: Mic2,          desc: "Provedores TTS globais (OpenAI TTS, ElevenLabs)" },
+  { id: "voice",         label: "Qchat Voice",   icon: Mic2,          desc: "Provedores TTS globais (OpenAI TTS, ElevenLabs)" },
   // Pricing: margem dinâmica por categoria + custo bruto dos providers
   // + top-up packs publicados pra venda. Mudança aqui afeta todos os
   // events futuros em <5s (cache do recorder invalidado no PUT).
@@ -375,7 +375,7 @@ function PaymentTab() {
 
   const copyUrl = (url: string) => { navigator.clipboard.writeText(url); toast.success("URL copiada!"); };
 
-  if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "var(--text-3)" }}>Carregando...</span></div>;
+  if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" /><span className="text-sm" style={{ color: "var(--text-3)" }}>Carregando...</span></div>;
 
   // apiBase pra montar a URL de webhook que vai colar no Stripe/Asaas.
   // Estratégia: derivar SEMPRE do hostname público quando disponível —
@@ -445,7 +445,7 @@ function PaymentTab() {
                 className="p-3 rounded-xl border-2 text-center relative transition-all"
                 style={{
                   borderColor: isSelected ? p.color : isActive ? "var(--green)" : "var(--border-default)",
-                  background: isSelected ? `${p.color}12` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
+                  background: isSelected ? `${p.color}12` : isActive ? "rgba(37, 99, 235,0.06)" : "transparent",
                   opacity: p.disabled ? 0.45 : 1,
                 }}>
                 {/* Badges no topo */}
@@ -456,7 +456,7 @@ function PaymentTab() {
                   <div>
                     {isActive && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider"
-                        style={{ background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }}>
+                        style={{ background: "rgba(37, 99, 235,0.18)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.35)" }}>
                         ATIVO
                       </span>
                     )}
@@ -466,7 +466,7 @@ function PaymentTab() {
                         selecionado
                       </span>
                     )}
-                    {testStatus === "ok" && !isActive && !isPending && <Check className="w-3 h-3 text-[#00d46a]" />}
+                    {testStatus === "ok" && !isActive && !isPending && <Check className="w-3 h-3 text-[#2563EB]" />}
                     {testStatus === "failed" && !isActive && !isPending && <X className="w-3 h-3" style={{ color: "#f87171" }} />}
                   </div>
                 </div>
@@ -513,7 +513,7 @@ function PaymentTab() {
                   </code>
                   {settings.stripe_secret_key_env === "live" && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      style={{ background: "rgba(37, 99, 235,0.12)", color: "#2563EB" }}>
                       Live
                     </span>
                   )}
@@ -648,7 +648,7 @@ function PaymentTab() {
                   </code>
                   {settings?.asaas_environment === "production" && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      style={{ background: "rgba(37, 99, 235,0.12)", color: "#2563EB" }}>
                       Produção
                     </span>
                   )}
@@ -746,7 +746,7 @@ function PaymentTab() {
                   </code>
                   {settings?.abacatepay_environment === "production" && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      style={{ background: "rgba(37, 99, 235,0.12)", color: "#2563EB" }}>
                       Produção
                     </span>
                   )}
@@ -804,7 +804,7 @@ function PaymentTab() {
                   <input type="radio" name="abacatepay_checkout" checked={form.abacatepay_checkout_type === t}
                     onChange={() => setForm(f => ({ ...f, abacatepay_checkout_type: t }))}
                     className="accent-[#0ea5e9]" />
-                  <span className="text-xs capitalize" style={{ color: "hsl(240 15% 80%)" }}>{t === "transparent" ? "Transparente (PIX Uniq)" : "Redirect"}</span>
+                  <span className="text-xs capitalize" style={{ color: "hsl(240 15% 80%)" }}>{t === "transparent" ? "Transparente (PIX Qchat)" : "Redirect"}</span>
                 </label>
               ))}
             </div>
@@ -896,7 +896,7 @@ function EmailSection() {
     },
   });
 
-  if (isLoading) return <div className="py-4"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /></div>;
+  if (isLoading) return <div className="py-4"><Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" /></div>;
 
   return (
     <Card>
@@ -913,12 +913,12 @@ function EmailSection() {
           </div>
           <div>
             <Label>Nome do Remetente</Label>
-            <Input value={form.sender_name || ""} onChange={e => setForm(f => ({ ...f, sender_name: e.target.value }))} placeholder="Uniq Chat" />
+            <Input value={form.sender_name || ""} onChange={e => setForm(f => ({ ...f, sender_name: e.target.value }))} placeholder="Qchat" />
           </div>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.is_enabled ?? false} onChange={e => setForm(f => ({ ...f, is_enabled: e.target.checked }))} className="accent-[#00d46a]" />
+            <input type="checkbox" checked={form.is_enabled ?? false} onChange={e => setForm(f => ({ ...f, is_enabled: e.target.checked }))} className="accent-[#2563EB]" />
             <span className="text-sm" style={{ color: "hsl(240 15% 80%)" }}>Habilitado</span>
           </label>
         </div>
@@ -969,7 +969,7 @@ function TemplateModal({ template, onClose }: { template: EmailTemplate; onClose
         <div>
           <Label>HTML</Label>
           <textarea value={html} onChange={e => setHtml(e.target.value)} rows={12}
-            className="w-full px-3.5 py-2.5 rounded-xl text-xs outline-none focus:border-[#00d46a] font-mono resize-y"
+            className="w-full px-3.5 py-2.5 rounded-xl text-xs outline-none focus:border-[#2563EB] font-mono resize-y"
             style={{ background: "hsl(240 18% 5%)", border: "1px solid var(--border)", color: "hsl(240 15% 80%)" }} />
         </div>
         <div className="flex justify-end gap-2">
@@ -993,7 +993,7 @@ function TemplatesSection() {
     <Card>
       <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>Templates de Email</h3>
       {isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" />
+        <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
       ) : templates.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum template encontrado.</p>
       ) : (
@@ -1008,7 +1008,7 @@ function TemplatesSection() {
               <div className="flex items-center gap-2">
                 <StatusBadge ok={t.is_active} label={t.is_active ? "Ativo" : "Inativo"} />
                 <button onClick={() => setEditing(t)} className="p-1.5 rounded-lg hover:bg-white/5">
-                  <Edit2 className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />
+                  <Edit2 className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
                 </button>
               </div>
             </div>
@@ -1051,7 +1051,7 @@ function OtpSection() {
     onError: () => toast.error("Erro ao salvar"),
   });
 
-  if (isLoading) return <Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" />;
+  if (isLoading) return <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />;
 
   return (
     <Card>
@@ -1064,7 +1064,7 @@ function OtpSection() {
             {["email", "whatsapp", "sms"].map(p => (
               <label key={p} className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="otp_provider" checked={form.otp_provider === p}
-                  onChange={() => setForm(f => ({ ...f, otp_provider: p }))} className="accent-[#00d46a]" />
+                  onChange={() => setForm(f => ({ ...f, otp_provider: p }))} className="accent-[#2563EB]" />
                 <span className="text-sm capitalize" style={{ color: "hsl(240 15% 80%)" }}>
                   {p === "whatsapp" ? "WhatsApp" : p === "sms" ? "SMS" : "Email"}
                 </span>
@@ -1091,7 +1091,7 @@ function OtpSection() {
             {["email", "whatsapp"].map(p => (
               <label key={p} className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="auto_msg_provider" checked={form.auto_msg_provider === p}
-                  onChange={() => setForm(f => ({ ...f, auto_msg_provider: p }))} className="accent-[#00d46a]" />
+                  onChange={() => setForm(f => ({ ...f, auto_msg_provider: p }))} className="accent-[#2563EB]" />
                 <span className="text-sm capitalize" style={{ color: "hsl(240 15% 80%)" }}>
                   {p === "whatsapp" ? "WhatsApp" : "Email"}
                 </span>
@@ -1133,7 +1133,7 @@ function CommunicationTab() {
         {SUB_TABS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setSub(id)}
             className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-            style={{ background: sub === id ? "rgba(0,212,106,0.15)" : "transparent", color: sub === id ? "#00d46a" : "var(--text-3)" }}>
+            style={{ background: sub === id ? "rgba(37, 99, 235,0.15)" : "transparent", color: sub === id ? "#2563EB" : "var(--text-3)" }}>
             <Icon className="w-3.5 h-3.5" />{label}
           </button>
         ))}
@@ -1170,7 +1170,7 @@ function ServerTab() {
         {(["servers", "instances"] as const).map(v => (
           <button key={v} onClick={() => setView(v)}
             className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-            style={{ background: view === v ? "rgba(0,212,106,0.15)" : "transparent", color: view === v ? "#00d46a" : "var(--text-3)" }}>
+            style={{ background: view === v ? "rgba(37, 99, 235,0.15)" : "transparent", color: view === v ? "#2563EB" : "var(--text-3)" }}>
             {v === "servers" ? "Servidores" : "Instâncias"}
           </button>
         ))}
@@ -1178,7 +1178,7 @@ function ServerTab() {
 
       <Card>
         {loading ? (
-          <div className="flex items-center gap-2 py-4"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /></div>
+          <div className="flex items-center gap-2 py-4"><Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" /></div>
         ) : view === "servers" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -1255,7 +1255,7 @@ function ProxiesTab() {
             </p>
             {!isLoading && (
               <p className="text-xs mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>
+                style={{ background: "rgba(37, 99, 235,0.1)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                 <Globe className="w-3 h-3" />
                 {count} {count === 1 ? "proxy configurado" : "proxies configurados"}
               </p>
@@ -1263,7 +1263,7 @@ function ProxiesTab() {
           </div>
           <a href="/admin/proxy"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium shrink-0 transition-all"
-            style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}>
+            style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.25)", color: "#2563EB" }}>
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel
           </a>
@@ -1322,16 +1322,16 @@ function ProvidersPageInner() {
               return (
                 <button key={tab.id} onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left relative${i < TABS.length - 1 ? " border-b" : ""}`}
-                  style={{ borderColor: "var(--border-subtle)", background: isActive ? "rgba(0,212,106,0.10)" : "transparent", transition: "background 0.2s" }}
+                  style={{ borderColor: "var(--border-subtle)", background: isActive ? "rgba(37, 99, 235,0.10)" : "transparent", transition: "background 0.2s" }}
                   onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--input)"; }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
-                  {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r" style={{ background: "#00d46a" }} />}
+                  {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r" style={{ background: "#2563EB" }} />}
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: isActive ? "rgba(0,212,106,0.15)" : "var(--input)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "var(--border-default)"}` }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#00d46a" : "var(--text-3)" }} />
+                    style={{ background: isActive ? "rgba(37, 99, 235,0.15)" : "var(--input)", border: `1px solid ${isActive ? "rgba(37, 99, 235,0.25)" : "var(--border-default)"}` }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#2563EB" : "var(--text-3)" }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate" style={{ color: isActive ? "#00d46a" : "var(--text-1)" }}>{tab.label}</p>
+                    <p className="text-xs font-medium truncate" style={{ color: isActive ? "#2563EB" : "var(--text-1)" }}>{tab.label}</p>
                     <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "var(--text-3)" }}>{tab.desc}</p>
                   </div>
                 </button>
@@ -1345,7 +1345,7 @@ function ProvidersPageInner() {
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => handleTabClick(id)}
               className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium"
-              style={{ background: active === id ? "rgba(0,212,106,0.15)" : "transparent", color: active === id ? "#00d46a" : "var(--text-3)" }}>
+              style={{ background: active === id ? "rgba(37, 99, 235,0.15)" : "transparent", color: active === id ? "#2563EB" : "var(--text-3)" }}>
               <Icon className="w-3.5 h-3.5" />
               <span className="truncate">{label.split(" ")[0]}</span>
             </button>

@@ -249,8 +249,8 @@ function ToolbarButton({
       style={{
         width: 28,
         height: 28,
-        background: active ? "rgba(0,212,106,0.14)" : "transparent",
-        color: active ? "#00d46a" : "var(--text-2)",
+        background: active ? "rgba(37, 99, 235,0.14)" : "transparent",
+        color: active ? "#2563EB" : "var(--text-2)",
       }}
       onMouseEnter={(e) => {
         if (disabled) return;

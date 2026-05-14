@@ -214,8 +214,8 @@ export function AIWizardModal({
               onClick={() => setQ({ ...q, role: r.value })}
               className="text-left rounded-lg px-3 py-2 text-sm transition"
               style={{
-                background: q.role === r.value ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
-                border: `1px solid ${q.role === r.value ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                background: q.role === r.value ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
+                border: `1px solid ${q.role === r.value ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
                 color: q.role === r.value ? "var(--green)" : "var(--text-1)",
               }}
             >
@@ -330,7 +330,7 @@ export function AIWizardModal({
           {phase === "diff" && (
             <span
               className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-              style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)" }}
+              style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)" }}
             >
               revisar
             </span>
@@ -494,7 +494,7 @@ function DiffView({
               className="rounded-xl overflow-hidden"
               style={{
                 background: "var(--surface-1)",
-                border: `1px solid ${isSelected ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                border: `1px solid ${isSelected ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
               }}
             >
               {/* Header da seção */}
@@ -503,14 +503,14 @@ function DiffView({
                 onClick={() => onToggle(s.key)}
                 className="w-full flex items-center gap-2 px-3 py-2 transition-colors"
                 style={{
-                  background: isSelected ? "rgba(0,212,106,0.04)" : "transparent",
+                  background: isSelected ? "rgba(37, 99, 235,0.04)" : "transparent",
                 }}
               >
                 <span
                   className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
                   style={{
                     background: isSelected ? "var(--green)" : "var(--surface-3)",
-                    border: `1px solid ${isSelected ? "rgba(0,212,106,0.40)" : "var(--surface-border)"}`,
+                    border: `1px solid ${isSelected ? "rgba(37, 99, 235,0.40)" : "var(--surface-border)"}`,
                   }}
                 >
                   {isSelected && <Check className="w-2.5 h-2.5" style={{ color: "var(--green-fg)" }} />}
@@ -610,7 +610,7 @@ function DiffPane({
       className="px-3 py-2 sm:[&:nth-child(2)]:border-l border-t sm:border-t-0"
       style={{
         borderColor: "var(--surface-border)",
-        background: highlight ? "rgba(0,212,106,0.04)" : "transparent",
+        background: highlight ? "rgba(37, 99, 235,0.04)" : "transparent",
       }}
     >
       <p

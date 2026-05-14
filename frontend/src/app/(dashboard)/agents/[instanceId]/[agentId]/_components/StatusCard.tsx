@@ -39,7 +39,7 @@ export function StatusCard({ form }: { form: AgentForm }) {
   ).length;
   const integrationName = form.integration_id
     ? (integrationsQuery.data?.find((i: any) => i.id === form.integration_id)?.name || "Custom")
-    : "Uniq AI";
+    : "QChat AI";
   const modelLabel = form.integration_id
     ? form.model || "(sem modelo)"
     : "auto-resolvido";
@@ -60,9 +60,9 @@ export function StatusCard({ form }: { form: AgentForm }) {
         <span
           className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-mono"
           style={{
-            background: form.is_active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
+            background: form.is_active ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
             color: form.is_active ? "var(--green)" : "var(--text-4)",
-            border: `1px solid ${form.is_active ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+            border: `1px solid ${form.is_active ? "rgba(37, 99, 235,0.20)" : "var(--surface-border)"}`,
           }}
         >
           {form.is_active ? "ativo" : "inativo"}
@@ -129,7 +129,7 @@ export function StatusCard({ form }: { form: AgentForm }) {
         />
         <SummaryRow
           icon={Wand2}
-          color="#00d46a"
+          color="#2563EB"
           label="Habilidades"
           value={`${enabledActions}/${ALL_ACTIONS.length} ativas`}
           dim={enabledActions === 0}

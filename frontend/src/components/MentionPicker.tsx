@@ -173,7 +173,7 @@ const CATEGORIES: {
   color: string;
 }[] = [
   // Entidades (referência a registro no banco)
-  { type: "instance", slash: "instancia", label: "Instância WhatsApp", icon: Smartphone, color: "#00d46a" },
+  { type: "instance", slash: "instancia", label: "Instância WhatsApp", icon: Smartphone, color: "#2563EB" },
   { type: "group",    slash: "grupo",     label: "Grupo WhatsApp",     icon: Users,      color: "#60a5fa" },
   { type: "contact",  slash: "contato",   label: "Contato CRM",        icon: User,       color: "#a78bfa" },
   { type: "tag",      slash: "tag",       label: "Tag",                icon: TagIcon,    color: "#f59e0b" },
@@ -958,8 +958,8 @@ export function MentionPicker({
       <div
         className="flex items-end gap-2 rounded-2xl px-4 py-3 relative"
         style={{
-          background: isLoading ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
-          border: `1px solid ${isLoading ? "rgba(0,212,106,0.3)" : editorFocused ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+          background: isLoading ? "rgba(37, 99, 235,0.08)" : "var(--surface-3)",
+          border: `1px solid ${isLoading ? "rgba(37, 99, 235,0.3)" : editorFocused ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
           transition: "border-color .15s ease",
         }}
       >

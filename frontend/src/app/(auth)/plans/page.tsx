@@ -36,7 +36,7 @@ interface PlanMeta {
 const PLAN_META: Record<string, PlanMeta> = {
   Free:     { icon: <MessageSquare className="w-5 h-5" />, color: "#60a5fa" },
   Starter:  { icon: <Flame className="w-5 h-5" />,         color: "#fb923c" },
-  Pro:      { icon: <Zap className="w-5 h-5" />,           color: "#00d46a", badge: "Mais Popular" },
+  Pro:      { icon: <Zap className="w-5 h-5" />,           color: "#2563EB", badge: "Mais Popular" },
   Business: { icon: <Building2 className="w-5 h-5" />,     color: "#a78bfa" },
   Lifetime: { icon: <Star className="w-5 h-5" />,          color: "#fbbf24", badge: "Vitalício" },
 };
@@ -276,7 +276,7 @@ function PlansContent() {
       style={{ background: "var(--surface-solid)" }}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]"
-          style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.06) 0%, transparent 65%)" }} />
+          style={{ background: "radial-gradient(ellipse at top, rgba(37, 99, 235,0.06) 0%, transparent 65%)" }} />
         <div className="absolute bottom-0 right-0 w-[500px] h-[400px]"
           style={{ background: "radial-gradient(ellipse at bottom right, rgba(167,139,250,0.04) 0%, transparent 60%)" }} />
       </div>
@@ -325,7 +325,7 @@ function PlansContent() {
                   border: inviteValid === false
                     ? "1px solid rgba(239,68,68,0.35)"
                     : inviteValid === true
-                    ? "1px solid rgba(0,212,106,0.4)"
+                    ? "1px solid rgba(37, 99, 235,0.4)"
                     : "1px solid var(--border-default)",
                   color: "var(--text-1)",
                 }}
@@ -373,14 +373,14 @@ function PlansContent() {
             >
               <div
                 className="pointer-events-none absolute -right-10 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full"
-                style={{ background: "radial-gradient(circle, rgba(0,212,106,0.14) 0%, transparent 72%)" }}
+                style={{ background: "radial-gradient(circle, rgba(37, 99, 235,0.14) 0%, transparent 72%)" }}
               />
               <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <div
                       className="flex h-9 w-9 items-center justify-center rounded-xl"
-                      style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
+                      style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.2)", color: "var(--green)" }}
                     >
                       <Briefcase className="w-4 h-4" />
                     </div>
@@ -404,10 +404,10 @@ function PlansContent() {
                   href="mailto:comercial@uniq.chat?subject=Plano%20customizado%20Uniq"
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 active:scale-[0.98] sm:min-w-[220px]"
                   style={{
-                    background: "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.1) 100%)",
+                    background: "linear-gradient(135deg, rgba(37, 99, 235,0.18) 0%, rgba(37, 99, 235,0.1) 100%)",
                     color: "var(--green)",
-                    border: "1px solid rgba(0,212,106,0.28)",
-                    boxShadow: "0 0 18px rgba(0,212,106,0.12)",
+                    border: "1px solid rgba(37, 99, 235,0.28)",
+                    boxShadow: "0 0 18px rgba(37, 99, 235,0.12)",
                   }}
                 >
                   <Mail className="w-4 h-4" />

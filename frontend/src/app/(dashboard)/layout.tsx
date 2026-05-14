@@ -7,8 +7,8 @@ import { LayoutClient } from "./LayoutClient";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { WorkspacePermissionsProvider } from "@/contexts/WorkspacePermissionsContext";
 import { PresenceProvider } from "@/contexts/PresenceProvider";
-import { UniqAIIslandProvider } from "@/components/uniq-ai/island-context";
-import { UniqAIIsland } from "@/components/uniq-ai/dynamic-island";
+import { QChatAIIslandProvider } from "@/components/uniq-ai/island-context";
+import { QChatAIIsland } from "@/components/uniq-ai/dynamic-island";
 import { AmbientAIPanel } from "@/components/uniq-ai/ambient-panel";
 import { CursorReactiveBackground } from "@/components/layout/CursorReactiveBackground";
 
@@ -25,20 +25,20 @@ export default async function DashboardLayout({
       <WorkspacePermissionsProvider>
         <PresenceProvider>
           <CursorReactiveBackground />
-          <UniqAIIslandProvider>
+          <QChatAIIslandProvider>
             <div className="flex h-screen overflow-hidden">
               <SidebarDock />
               <LayoutClient>{children}</LayoutClient>
             </div>
-            {/* UniqAIIsland (FAB flutuante) só aparece em md+. No mobile,
-                a entrada Uniq AI vive no centro do MobileDock. */}
+            {/* QChatAIIsland (FAB flutuante) só aparece em md+. No mobile,
+                a entrada QChat AI vive no centro do MobileDock. */}
             <div className="hidden md:contents">
-              <UniqAIIsland />
+              <QChatAIIsland />
             </div>
             <AmbientAIPanel />
             <MobileDock />
             <CommandPalette />
-          </UniqAIIslandProvider>
+          </QChatAIIslandProvider>
         </PresenceProvider>
       </WorkspacePermissionsProvider>
     </WorkspaceProvider>

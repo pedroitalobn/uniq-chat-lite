@@ -19,7 +19,7 @@ import { showConfirm } from "@/lib/confirm";
 export type FunnelStage = { id: string; funnel_id: string; name: string; color?: string; order?: number };
 export type Funnel = { id: string; name: string; description?: string; color?: string; stages?: FunnelStage[] };
 
-const PRESET_COLORS = ["#00d46a", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+const PRESET_COLORS = ["#2563EB", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 function FieldInput({
   icon: Icon, label, value, onChange, placeholder, required, type = "text",
@@ -83,7 +83,7 @@ function FunnelList({ funnels, onCreate, onEdit, onDelete }: {
     <div className="space-y-2">
       <button onClick={onCreate}
         className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium"
-        style={{ background: "rgba(0,212,106,0.10)", border: "1px dashed rgba(0,212,106,0.30)", color: "var(--green)" }}>
+        style={{ background: "rgba(37, 99, 235,0.10)", border: "1px dashed rgba(37, 99, 235,0.30)", color: "var(--green)" }}>
         <Plus className="w-4 h-4" /> Novo funil
       </button>
       {funnels.length === 0 ? (
@@ -124,7 +124,7 @@ function FunnelForm({ funnel, workspaceId, onDone }: {
         { id: "tmp-2", name: "Qualificação",  color: "#fbbf24", persisted: false },
         { id: "tmp-3", name: "Proposta",      color: "#a78bfa", persisted: false },
         { id: "tmp-4", name: "Negociação",    color: "#fb923c", persisted: false },
-        { id: "tmp-5", name: "Fechado",       color: "#00d46a", persisted: false },
+        { id: "tmp-5", name: "Fechado",       color: "#2563EB", persisted: false },
       ]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +207,7 @@ function FunnelForm({ funnel, workspaceId, onDone }: {
           <SectionHeading icon={Layers}>Etapas do pipeline</SectionHeading>
           <button type="button" onClick={addStage}
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
-            style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.20)" }}>
+            style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.20)" }}>
             <Plus className="w-3 h-3" /> Adicionar etapa
           </button>
         </div>

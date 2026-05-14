@@ -284,7 +284,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
+              style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}
             >
               <QrCode className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
@@ -328,7 +328,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
             <div className="flex flex-col items-center gap-3 py-8">
               <div
                 className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
+                style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}
               >
                 <CheckCircle2 className="w-8 h-8" style={{ color: "var(--green)" }} />
               </div>
@@ -369,8 +369,8 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 {/* Countdown badge - above QR code */}
                 {qrCountdown !== null && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium"
-                    style={{ background: qrCountdown < 15 ? "rgba(239,68,68,0.15)" : "rgba(0,212,106,0.1)", 
-                             border: `1px solid ${qrCountdown < 15 ? "rgba(239,68,68,0.3)" : "rgba(0,212,106,0.2)"}`,
+                    style={{ background: qrCountdown < 15 ? "rgba(239,68,68,0.15)" : "rgba(37, 99, 235,0.1)", 
+                             border: `1px solid ${qrCountdown < 15 ? "rgba(239,68,68,0.3)" : "rgba(37, 99, 235,0.2)"}`,
                              color: qrCountdown < 15 ? "#f87171" : "var(--green)" }}>
                     <Clock className="w-3 h-3" />
                     Expira em {qrCountdown}s
@@ -378,7 +378,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 )}
                 <div
                   className="p-3 rounded-2xl"
-                  style={{ background: "var(--text-1)", boxShadow: "0 0 0 1px rgba(0,212,106,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
+                  style={{ background: "var(--text-1)", boxShadow: "0 0 0 1px rgba(37, 99, 235,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
                 >
                   <QRCodeSVG value={qrCode} size={200} />
                 </div>
@@ -452,7 +452,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               {pairingCode ? (
                 <div className="space-y-3">
                   <div className="rounded-xl p-4 text-center"
-                    style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                    style={{ background: "rgba(37, 99, 235,0.06)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                     <p className="text-xs mb-2" style={{ color: "hsl(240 8% 48%)" }}>Código de pareamento</p>
                     <p className="text-3xl font-semibold font-mono tracking-[0.2em]" style={{ color: "var(--green)" }}>
                       {pairingCode}

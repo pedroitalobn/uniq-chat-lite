@@ -51,7 +51,7 @@ export default function WidgetBuilder() {
     enabled: true,
     display_name: "",
     greeting: "",
-    primary_color: "#00d46a",
+    primary_color: "#2563EB",
     position: "bottom-right",
     avatar_url: "",
     destination_type: "inbox",
@@ -76,7 +76,7 @@ export default function WidgetBuilder() {
         setForm((prev) => ({
           ...prev,
           ...d,
-          badge_color: d.badge_color || d.primary_color || "#00d46a",
+          badge_color: d.badge_color || d.primary_color || "#2563EB",
         }));
       })
       .catch(() => toast.error("Erro ao carregar config do widget"))
@@ -114,7 +114,7 @@ export default function WidgetBuilder() {
     }
   };
 
-  const color = form.primary_color ?? "#00d46a";
+  const color = form.primary_color ?? "#2563EB";
   const badgeColor = form.badge_color || color;
 
   if (loading) {
@@ -370,7 +370,7 @@ export default function WidgetBuilder() {
 }
 
 function PreviewContainer({ form }: { form: Record<string, any> }) {
-  const color = form.primary_color ?? "#00d46a";
+  const color = form.primary_color ?? "#2563EB";
   const badgeColor = form.badge_color || color;
   const pos = form.position ?? "bottom-right";
   const isTop = pos.startsWith("top");

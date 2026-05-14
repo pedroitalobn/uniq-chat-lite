@@ -2,12 +2,12 @@ package email
 
 import "fmt"
 
-// Uniq.chat brand — tema escuro da aplicação, accent verde.
+// Qchat brand — tema escuro da aplicação, accent verde.
 // HSL da UI convertido pra hex pq vários clientes de email ignoram hsl().
 const (
-	BrandPrimary   = "#00d46a" // Uniq green
-	BrandSecondary = "#00b85c" // Green darker (hover)
-	BrandAccent    = "#00d46a" // Same as primary
+	BrandPrimary   = "#2563EB" // Uniq green
+	BrandSecondary = "#1D4ED8" // Green darker (hover)
+	BrandAccent    = "#2563EB" // Same as primary
 	BrandWarning   = "#fb923c" // Orange
 	BrandDanger    = "#ef4444" // Red
 	BrandDark      = "#e8e9ed" // hsl(240 15% 92%) — texto primário no escuro

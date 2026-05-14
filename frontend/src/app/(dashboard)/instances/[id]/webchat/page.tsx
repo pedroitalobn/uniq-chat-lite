@@ -39,8 +39,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       onClick={() => onChange(!checked)}
       className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
       style={{
-        background: checked ? "#00d46a" : "var(--border-strong)",
-        border: `1px solid ${checked ? "rgba(0,212,106,0.50)" : "var(--border-strong)"}`,
+        background: checked ? "#2563EB" : "var(--border-strong)",
+        border: `1px solid ${checked ? "rgba(37, 99, 235,0.50)" : "var(--border-strong)"}`,
       }}
     >
       <span
@@ -62,7 +62,7 @@ export default function WebChatConfigPage() {
   const [form, setForm] = useState<Partial<WebChatConfig>>({
     display_name: "",
     greeting: "Olá! Como posso ajudar?",
-    primary_color: "#00d46a",
+    primary_color: "#2563EB",
     position: "bottom-right",
     avatar_url: "",
     whatsapp_redirect_number: "",
@@ -91,7 +91,7 @@ export default function WebChatConfigPage() {
       setForm({
         display_name: configQuery.data.display_name ?? "",
         greeting: configQuery.data.greeting ?? "",
-        primary_color: configQuery.data.primary_color ?? "#00d46a",
+        primary_color: configQuery.data.primary_color ?? "#2563EB",
         position: configQuery.data.position ?? "bottom-right",
         avatar_url: configQuery.data.avatar_url ?? "",
         whatsapp_redirect_number: configQuery.data.whatsapp_redirect_number ?? "",
@@ -119,7 +119,7 @@ export default function WebChatConfigPage() {
     });
   };
 
-  const primaryColor = form.primary_color ?? "#00d46a";
+  const primaryColor = form.primary_color ?? "#2563EB";
 
   return (
     <div className="space-y-5">
@@ -153,7 +153,7 @@ export default function WebChatConfigPage() {
             <input
               value={form.display_name ?? ""}
               onChange={(e) => setForm((p) => ({ ...p, display_name: e.target.value }))}
-              placeholder="Ex: Suporte Uniq"
+              placeholder="Ex: Suporte Qchat"
               style={inp}
             />
           </div>
@@ -174,14 +174,14 @@ export default function WebChatConfigPage() {
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
-                  value={form.primary_color ?? "#00d46a"}
+                  value={form.primary_color ?? "#2563EB"}
                   onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
                   className="h-10 w-12 rounded-lg cursor-pointer border-0 bg-transparent"
                 />
                 <input
-                  value={form.primary_color ?? "#00d46a"}
+                  value={form.primary_color ?? "#2563EB"}
                   onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
-                  placeholder="#00d46a"
+                  placeholder="#2563EB"
                   style={{ ...inp, fontFamily: "monospace", fontSize: 13 }}
                 />
               </div>
@@ -246,10 +246,10 @@ export default function WebChatConfigPage() {
             disabled={saveMutation.isPending}
             className="w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.12)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
+              color: "#2563EB",
+              border: "1px solid rgba(37, 99, 235,0.30)",
+              boxShadow: "0 4px 16px rgba(37, 99, 235,0.12)",
               opacity: saveMutation.isPending ? 0.7 : 1,
             }}
           >
@@ -274,9 +274,9 @@ export default function WebChatConfigPage() {
                 onClick={handleCopy}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
                 style={{
-                  background: copied ? "rgba(0,212,106,0.12)" : "var(--surface-3)",
-                  color: copied ? "#00d46a" : "var(--text-2)",
-                  border: `1px solid ${copied ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                  background: copied ? "rgba(37, 99, 235,0.12)" : "var(--surface-3)",
+                  color: copied ? "#2563EB" : "var(--text-2)",
+                  border: `1px solid ${copied ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                 }}
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}

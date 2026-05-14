@@ -25,7 +25,7 @@ const STATUS_FILTERS: { id: "all" | CrmTask["status"]; label: string; color: str
   { id: "all",         label: "Todas",          color: "var(--text-3)" },
   { id: "pending",     label: "Pendentes",      color: "#fbbf24" },
   { id: "in_progress", label: "Em andamento",   color: "#60a5fa" },
-  { id: "completed",   label: "Concluídas",     color: "#00d46a" },
+  { id: "completed",   label: "Concluídas",     color: "#2563EB" },
   { id: "cancelled",   label: "Canceladas",     color: "var(--text-3)" },
 ];
 
@@ -152,8 +152,8 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="rounded-2xl py-14 text-center" style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)" }}>
       <div className="w-14 h-14 mx-auto mb-3 rounded-2xl flex items-center justify-center"
-        style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.18)" }}>
-        <ListTodo className="w-7 h-7" style={{ color: "#00d46a" }} />
+        style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.18)" }}>
+        <ListTodo className="w-7 h-7" style={{ color: "#2563EB" }} />
       </div>
       <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>Nenhuma tarefa criada</h3>
       <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>
@@ -161,7 +161,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </p>
       <button onClick={onCreate}
         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-        style={{ background: "#00d46a", color: "#03170a" }}>
+        style={{ background: "#2563EB", color: "#03170a" }}>
         <Plus className="w-4 h-4" /> Criar primeira tarefa
       </button>
     </div>
@@ -200,9 +200,9 @@ function TaskRow({ task, onEdit, onDelete, onComplete }: {
       <button onClick={() => !done && onComplete(task)} disabled={done}
         className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
         style={done
-          ? { background: "rgba(0,212,106,0.18)", border: "1px solid rgba(0,212,106,0.4)" }
+          ? { background: "rgba(37, 99, 235,0.18)", border: "1px solid rgba(37, 99, 235,0.4)" }
           : { background: "transparent", border: "1px solid hsl(240 12% 22%)" }}>
-        {done && <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />}
+        {done && <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />}
       </button>
       <Icon className="w-4 h-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
       <div className="flex-1 min-w-0">
@@ -300,7 +300,7 @@ function TaskModal({ workspaceId, task, onClose, onSaved }: {
               <button type="button" onClick={() => setForm({ ...form, assignee_type: "user" })}
                 className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium"
                 style={form.assignee_type === "user"
-                  ? { background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.3)", color: "#00d46a" }
+                  ? { background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.3)", color: "#2563EB" }
                   : { background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>
                 <User className="w-3.5 h-3.5" /> Membro do time
               </button>
@@ -345,7 +345,7 @@ function TaskModal({ workspaceId, task, onClose, onSaved }: {
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ color: "var(--text-2)" }}>Cancelar</button>
           <button onClick={() => saveMut.mutate()} disabled={!form.title || saveMut.isPending}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-60"
-            style={{ background: "#00d46a", color: "#03170a" }}>
+            style={{ background: "#2563EB", color: "#03170a" }}>
             {saveMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? "Salvar" : "Criar tarefa"}
           </button>

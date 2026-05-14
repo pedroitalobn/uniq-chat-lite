@@ -11,10 +11,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, Maximize2, ExternalLink } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
+import { QChatAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
-import { useUniqAIIsland } from "./island-context";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { useQChatAIIsland } from "./island-context";
 
 const PANEL_WIDTH = 400;
 
@@ -87,11 +87,11 @@ function getPageLabel(pathname: string): string {
   if (pathname.startsWith("/shops")) return "Lojas";
   if (pathname === "/dashboard") return "Dashboard";
   if (pathname.startsWith("/settings")) return "Configurações";
-  return "Uniq";
+  return "Qchat";
 }
 
 export function AmbientAIPanel() {
-  const { state, close, pageContext } = useUniqAIIsland();
+  const { state, close, pageContext } = useQChatAIIsland();
   const pathname = usePathname() || "";
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -152,7 +152,7 @@ export function AmbientAIPanel() {
             <div
               className="absolute top-20 right-8 w-48 h-48 rounded-full pointer-events-none"
               style={{
-                background: "radial-gradient(circle, rgba(0,212,106,0.07) 0%, transparent 70%)",
+                background: "radial-gradient(circle, rgba(37, 99, 235,0.07) 0%, transparent 70%)",
                 filter: "blur(30px)",
               }}
             />
@@ -165,16 +165,16 @@ export function AmbientAIPanel() {
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: "rgba(0,212,106,0.15)",
-                  border: "1px solid rgba(0,212,106,0.3)",
-                  boxShadow: "0 0 12px rgba(0,212,106,0.2)",
+                  background: "rgba(37, 99, 235,0.15)",
+                  border: "1px solid rgba(37, 99, 235,0.3)",
+                  boxShadow: "0 0 12px rgba(37, 99, 235,0.2)",
                 }}
               >
-                <UniqAIBrandMark className="w-4 h-4" stroke="var(--green)" />
+                <QChatAIBrandMark className="w-4 h-4" stroke="var(--green)" />
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/90 leading-none">Uniq AI</p>
+                <p className="text-sm font-medium text-white/90 leading-none">QChat AI</p>
                 <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
                   Contexto: {pageContext?.label || pageLabel}
                 </p>
@@ -236,7 +236,7 @@ export function AmbientAIPanel() {
 
             {/* Chat panel — flex-1 ocupa o restante */}
             <div className="flex-1 min-h-0">
-              <UniqAIChatPanel
+              <QChatAIChatPanel
                 compact
                 hideHeader
                 messages={messages}

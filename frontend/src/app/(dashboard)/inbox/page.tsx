@@ -48,7 +48,7 @@ type ViewKind = "all" | "messages" | "groups" | "contacts" | "channels" | "statu
 // Chave inclui wsId pra cada workspace ter sua própria configuração de inbox.
 const FILTERS_KEY_PREFIX = "inbox:filters:v1:";
 const inboxGlass = {
-  headerBg: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.018) 58%, rgba(0,212,106,0.025) 100%)",
+  headerBg: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.018) 58%, rgba(37, 99, 235,0.025) 100%)",
   controlBg: "rgba(255,255,255,0.06)",
   controlBgHover: "rgba(255,255,255,0.10)",
   controlBorder: "rgba(255,255,255,0.10)",
@@ -739,12 +739,12 @@ function InboxPage() {
         <div
           className="flex items-center gap-3 px-4 py-3 animate-pulse-once"
           style={{
-            background: "linear-gradient(90deg, rgba(0,212,106,0.12), rgba(0,212,106,0.06))",
-            borderBottom: "1px solid rgba(0,212,106,0.25)",
+            background: "linear-gradient(90deg, rgba(37, 99, 235,0.12), rgba(37, 99, 235,0.06))",
+            borderBottom: "1px solid rgba(37, 99, 235,0.25)",
           }}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(0,212,106,0.2)" }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(37, 99, 235,0.2)" }}>
               <Phone className="w-4 h-4 animate-bounce" style={{ color: "var(--green)" }} />
             </div>
             <div className="min-w-0">
@@ -1248,7 +1248,7 @@ function InboxPage() {
             title="Arraste para redimensionar · duplo-clique restaura"
           >
             <div
-              className="absolute inset-y-0 -left-1 -right-1 transition-colors group-hover:bg-[rgba(0,212,106,0.15)]"
+              className="absolute inset-y-0 -left-1 -right-1 transition-colors group-hover:bg-[rgba(37, 99, 235,0.15)]"
             />
           </div>
         )}
@@ -1278,12 +1278,12 @@ function NoneSelected({ count }: { count: number }) {
     <div className="flex h-full flex-col items-center justify-center gap-5 p-12 text-center">
       {/* Ambient glow behind icon */}
       <div className="relative">
-        <div className="absolute inset-0 rounded-full blur-2xl" style={{ background: "rgba(0,212,106,0.08)" }} />
+        <div className="absolute inset-0 rounded-full blur-2xl" style={{ background: "rgba(37, 99, 235,0.08)" }} />
         <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-          background: "linear-gradient(135deg, rgba(0,212,106,0.1) 0%, rgba(0,212,106,0.04) 100%)",
-          border: "1px solid rgba(0,212,106,0.15)",
+          background: "linear-gradient(135deg, rgba(37, 99, 235,0.1) 0%, rgba(37, 99, 235,0.04) 100%)",
+          border: "1px solid rgba(37, 99, 235,0.15)",
           backdropFilter: "blur(16px)",
-          boxShadow: "0 0 32px rgba(0,212,106,0.08)",
+          boxShadow: "0 0 32px rgba(37, 99, 235,0.08)",
         }}>
           <MessageSquare className="h-7 w-7" style={{ color: "var(--green)", opacity: 0.7 }} />
         </div>
@@ -1300,12 +1300,12 @@ function NoneSelected({ count }: { count: number }) {
       </div>
       <Link href="/uniq-ai">
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:scale-[1.02]" style={{
-          background: "rgba(0,212,106,0.08)",
-          border: "1px solid rgba(0,212,106,0.18)",
+          background: "rgba(37, 99, 235,0.08)",
+          border: "1px solid rgba(37, 99, 235,0.18)",
           color: "var(--green)",
         }}>
           <Sparkles className="w-3.5 h-3.5" />
-          Perguntar ao Uniq AI →
+          Perguntar ao QChat AI →
         </div>
       </Link>
     </div>
@@ -1327,11 +1327,11 @@ function AgentDropdown({
   // "all" é o default do agente (visão geral). Qualquer outro valor é
   // considerado filtro ativo e ganha a cor verde.
   const isActive = agentScope !== "all";
-  const bg = isActive ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
-  const bgHover = isActive ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
-  const border = isActive ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
-  const borderHover = isActive ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
-  const fg = isActive ? "#00d46a" : "var(--text-1)";
+  const bg = isActive ? "rgba(37, 99, 235,0.12)" : inboxGlass.controlBg;
+  const bgHover = isActive ? "rgba(37, 99, 235,0.18)" : inboxGlass.controlBgHover;
+  const border = isActive ? "rgba(37, 99, 235,0.25)" : inboxGlass.controlBorder;
+  const borderHover = isActive ? "rgba(37, 99, 235,0.35)" : inboxGlass.controlBorderHover;
+  const fg = isActive ? "#2563EB" : "var(--text-1)";
   return (
     <Dropdown
       open={open}
@@ -1346,7 +1346,7 @@ function AgentDropdown({
             background: bg,
             backdropFilter: "blur(8px)",
             border: `1px solid ${border}`,
-            boxShadow: isActive ? "0 0 12px rgba(0,212,106,0.10)" : "none",
+            boxShadow: isActive ? "0 0 12px rgba(37, 99, 235,0.10)" : "none",
             color: fg,
             opacity: canViewAll ? 1 : 0.6,
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
@@ -1354,7 +1354,7 @@ function AgentDropdown({
           onMouseEnter={e => { if (canViewAll) { e.currentTarget.style.background = bgHover; e.currentTarget.style.borderColor = borderHover; } }}
           onMouseLeave={e => { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = border; }}
         >
-          <UserIcon className="h-3.5 w-3.5" style={{ color: isActive ? "#00d46a" : "hsl(240 8% 48%)" }} />
+          <UserIcon className="h-3.5 w-3.5" style={{ color: isActive ? "#2563EB" : "hsl(240 8% 48%)" }} />
           <span className={isActive ? "" : "hidden sm:inline"}>{currentLabel}</span>
           <ChevronDown className="h-3 w-3" />
         </button>
@@ -1389,7 +1389,7 @@ function AgentDropdown({
                 {m.is_owner && (
                   <span
                     className="ml-auto rounded-full px-1.5 py-0.5 text-[9px]"
-                    style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a" }}
+                    style={{ background: "rgba(37, 99, 235,0.1)", color: "#2563EB" }}
                   >
                     owner
                   </span>
@@ -1416,12 +1416,12 @@ function SingleSelectDropdown({
 }) {
   const [open, setOpen] = useState(false);
   // Cores conforme estado (active = filtro divergindo do default).
-  const triggerBg = active ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
-  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
-  const triggerBorder = active ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
-  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
-  const triggerColor = active ? "#00d46a" : "var(--text-1)";
-  const iconColor = active ? "#00d46a" : "hsl(240 8% 48%)";
+  const triggerBg = active ? "rgba(37, 99, 235,0.12)" : inboxGlass.controlBg;
+  const triggerBgHover = active ? "rgba(37, 99, 235,0.18)" : inboxGlass.controlBgHover;
+  const triggerBorder = active ? "rgba(37, 99, 235,0.25)" : inboxGlass.controlBorder;
+  const triggerBorderHover = active ? "rgba(37, 99, 235,0.35)" : inboxGlass.controlBorderHover;
+  const triggerColor = active ? "#2563EB" : "var(--text-1)";
+  const iconColor = active ? "#2563EB" : "hsl(240 8% 48%)";
   return (
     <Dropdown
       open={open}
@@ -1436,7 +1436,7 @@ function SingleSelectDropdown({
             backdropFilter: "blur(8px)",
             border: `1px solid ${triggerBorder}`,
             color: triggerColor,
-            boxShadow: active ? "0 0 12px rgba(0,212,106,0.10)" : "none",
+            boxShadow: active ? "0 0 12px rgba(37, 99, 235,0.10)" : "none",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           onMouseEnter={e => { e.currentTarget.style.background = triggerBgHover; e.currentTarget.style.borderColor = triggerBorderHover; }}
@@ -1494,25 +1494,25 @@ function MultiSelectDropdown({
           className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
           title={label}
           style={{
-            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg,
+            background: selected.length > 0 ? "rgba(37, 99, 235,0.12)" : inboxGlass.controlBg,
             backdropFilter: "blur(8px)",
-            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder}`,
-            boxShadow: selected.length > 0 ? "0 0 12px rgba(0,212,106,0.10)" : "none",
-            color: selected.length > 0 ? "#00d46a" : "var(--text-1)",
+            border: `1px solid ${selected.length > 0 ? "rgba(37, 99, 235,0.25)" : inboxGlass.controlBorder}`,
+            boxShadow: selected.length > 0 ? "0 0 12px rgba(37, 99, 235,0.10)" : "none",
+            color: selected.length > 0 ? "#2563EB" : "var(--text-1)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           onMouseEnter={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
+            e.currentTarget.style.background = active ? "rgba(37, 99, 235,0.18)" : inboxGlass.controlBgHover;
+            e.currentTarget.style.borderColor = active ? "rgba(37, 99, 235,0.35)" : inboxGlass.controlBorderHover;
           }}
           onMouseLeave={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
+            e.currentTarget.style.background = active ? "rgba(37, 99, 235,0.12)" : inboxGlass.controlBg;
+            e.currentTarget.style.borderColor = active ? "rgba(37, 99, 235,0.25)" : inboxGlass.controlBorder;
           }}
         >
-          <span style={{ color: selected.length > 0 ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
+          <span style={{ color: selected.length > 0 ? "#2563EB" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
           {/* Em mobile: só label se houver seleção (= filtro ativo). Sem
               seleção, fica ícone-only pra economizar largura. */}
           <span className={selected.length > 0 ? "" : "hidden sm:inline"}>{label}</span>
@@ -1549,8 +1549,8 @@ function MultiSelectDropdown({
             <span
               className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded"
               style={{
-                background: isSelected ? "#00d46a" : "transparent",
-                border: `1px solid ${isSelected ? "#00d46a" : "hsl(240 12% 24%)"}`,
+                background: isSelected ? "#2563EB" : "transparent",
+                border: `1px solid ${isSelected ? "#2563EB" : "hsl(240 12% 24%)"}`,
               }}
             >
               {isSelected && <Check className="h-2.5 w-2.5" style={{ color: "#03170a" }} />}
@@ -1658,8 +1658,8 @@ function DropdownItem({
       onClick={onClick}
       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5"
       style={{
-        color: active ? "#00d46a" : "var(--text-1)",
-        background: active ? "rgba(0,212,106,0.08)" : "transparent",
+        color: active ? "#2563EB" : "var(--text-1)",
+        background: active ? "rgba(37, 99, 235,0.08)" : "transparent",
         transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
       }}
     >
@@ -1689,11 +1689,11 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
       <div
         className="max-w-md rounded-2xl p-6 text-center"
         style={{
-          background: "rgba(0,212,106,0.05)",
-          border: "1px solid rgba(0,212,106,0.25)",
+          background: "rgba(37, 99, 235,0.05)",
+          border: "1px solid rgba(37, 99, 235,0.25)",
         }}
       >
-        <RefreshCw className={`mx-auto h-8 w-8 ${running ? "animate-spin" : ""}`} style={{ color: "#00d46a" }} />
+        <RefreshCw className={`mx-auto h-8 w-8 ${running ? "animate-spin" : ""}`} style={{ color: "#2563EB" }} />
         <h2 className="mt-3 text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
           Primeira sincronização
         </h2>
@@ -1706,7 +1706,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           onClick={onBackfill}
           disabled={running}
           className="mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
-          style={{ background: "#00d46a", color: "#03170a" }}
+          style={{ background: "#2563EB", color: "#03170a" }}
         >
           {running ? "Sincronizando…" : "Iniciar sincronização"}
         </button>
@@ -1850,7 +1850,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
                   GET /v1/conversations/health (probe)
                 </div>
                 {probe.ok === true ? (
-                  <div style={{ color: "#00d46a" }}>200 — rota responde</div>
+                  <div style={{ color: "#2563EB" }}>200 — rota responde</div>
                 ) : (
                   <div>
                     <div>status: {probe.status ?? "network"}</div>
@@ -1868,7 +1868,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
       <button
         onClick={onRetry}
         className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium"
-        style={{ background: "#00d46a", color: "#03170a" }}
+        style={{ background: "#2563EB", color: "#03170a" }}
       >
         {cta}
       </button>
@@ -1916,10 +1916,10 @@ function InboxMenu({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center justify-center rounded-lg p-1.5"
           style={{
-            background: open ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg,
+            background: open ? "rgba(37, 99, 235,0.12)" : inboxGlass.controlBg,
             backdropFilter: "blur(8px)",
-            border: open ? "1px solid rgba(0,212,106,0.25)" : `1px solid ${inboxGlass.controlBorder}`,
-            color: open ? "#00d46a" : "var(--text-3)",
+            border: open ? "1px solid rgba(37, 99, 235,0.25)" : `1px solid ${inboxGlass.controlBorder}`,
+            color: open ? "#2563EB" : "var(--text-3)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           title="Mais opções do inbox"
@@ -2035,9 +2035,9 @@ function NotificationsButton({
       ? muted ? "Reativar som e notificações" : "Silenciar notificações"
       : "Ativar notificações desktop e som de mensagens";
   // Verde quando ativas (perm granted + não-muted). Cinza quando off/denied.
-  const bg = showOff ? inboxGlass.controlBg : "rgba(0,212,106,0.10)";
-  const border = showOff ? inboxGlass.controlBorder : "rgba(0,212,106,0.22)";
-  const fg = showOff ? "var(--text-3)" : "#00d46a";
+  const bg = showOff ? inboxGlass.controlBg : "rgba(37, 99, 235,0.10)";
+  const border = showOff ? inboxGlass.controlBorder : "rgba(37, 99, 235,0.22)";
+  const fg = showOff ? "var(--text-3)" : "#2563EB";
   return (
     <button
       type="button"
@@ -2066,7 +2066,7 @@ function BackfillPillButton({
       onClick={onClick}
       disabled={running}
       className="relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
-      style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+      style={{ background: "rgba(37, 99, 235,0.1)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.25)" }}
       title={`Sincronizar histórico · ${pending} mensagens antigas pendentes`}
       aria-label="Sincronizar histórico"
     >
@@ -2074,7 +2074,7 @@ function BackfillPillButton({
       {pending > 0 && (
         <span
           className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
-          style={{ background: "#00d46a", color: "#03170a" }}
+          style={{ background: "#2563EB", color: "#03170a" }}
         >
           {pending > 99 ? "99+" : pending}
         </span>
@@ -2227,7 +2227,7 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-3)" }}>
-                            <span className="font-medium" style={{ color: h.direction === "out" ? "#00d46a" : "var(--text-1)" }}>
+                            <span className="font-medium" style={{ color: h.direction === "out" ? "#2563EB" : "var(--text-1)" }}>
                               {h.contact_name || h.sender_name || h.channel_key}
                             </span>
                             <span>·</span>
@@ -2259,7 +2259,7 @@ function highlightMatch(snippet: string, q: string): React.ReactNode {
   return (
     <>
       {snippet.slice(0, idx)}
-      <mark style={{ background: "rgba(0,212,106,0.25)", color: "#00d46a", padding: "0 2px", borderRadius: 2 }}>
+      <mark style={{ background: "rgba(37, 99, 235,0.25)", color: "#2563EB", padding: "0 2px", borderRadius: 2 }}>
         {snippet.slice(idx, idx + q.length)}
       </mark>
       {snippet.slice(idx + q.length)}

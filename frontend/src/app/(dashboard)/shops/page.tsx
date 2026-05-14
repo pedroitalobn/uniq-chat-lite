@@ -83,15 +83,15 @@ export default function ShopsPage() {
           onClick={() => setCreating(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235,0.20) 0%, rgba(37, 99, 235,0.10) 100%)",
             backdropFilter: "blur(12px) saturate(180%)",
             WebkitBackdropFilter: "blur(12px) saturate(180%)",
-            border: "1px solid rgba(0,212,106,0.25)",
+            border: "1px solid rgba(37, 99, 235,0.25)",
             color: "var(--green)",
             transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.30) 0%, rgba(0,212,106,0.18) 100%)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)"; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.30) 0%, rgba(37, 99, 235,0.18) 100%)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.20) 0%, rgba(37, 99, 235,0.10) 100%)"; }}
         >
           <Plus className="w-4 h-4" /> Nova shop
         </button>
@@ -130,7 +130,7 @@ export default function ShopsPage() {
             onClick={() => setCreating(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(37, 99, 235,0.18)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
           >
             <Plus className="w-4 h-4" />
@@ -338,14 +338,14 @@ export default function ShopsPage() {
                 disabled={!form.name.trim() || createMut.isPending}
                 className="flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center disabled:opacity-50"
                 style={{
-                  background: "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.12) 100%)",
+                  background: "linear-gradient(135deg, rgba(37, 99, 235,0.25) 0%, rgba(37, 99, 235,0.12) 100%)",
                   backdropFilter: "blur(12px)",
-                  border: "1px solid rgba(0,212,106,0.30)",
+                  border: "1px solid rgba(37, 99, 235,0.30)",
                   color: "var(--green)",
                   transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
-                onMouseEnter={e => { if (!createMut.isPending) (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.38) 0%, rgba(0,212,106,0.20) 100%)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.12) 100%)"; }}
+                onMouseEnter={e => { if (!createMut.isPending) (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.38) 0%, rgba(37, 99, 235,0.20) 100%)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(37, 99, 235,0.25) 0%, rgba(37, 99, 235,0.12) 100%)"; }}
               >
                 {createMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar"}
               </button>

@@ -162,8 +162,8 @@ export default function RolesPage() {
 
   const getCategoryColor = (cat: string) => {
     const colors: Record<string, string> = {
-      // Inbox/atendimento — verde Uniq
-      inbox: "#00d46a",
+      // Inbox/atendimento — azul Qchat
+      inbox: "#2563EB",
       tickets: "#4ade80",
       notes: "#a3e635",
       queues: "#34d399",
@@ -307,8 +307,8 @@ export default function RolesPage() {
                       onClick={toggleAllCat}
                       className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-white/5"
                       style={{
-                        color: allSelected ? "#00d46a" : someSelected ? "#f59e0b" : "hsl(240 8% 52%)",
-                        border: `1px solid ${allSelected ? "rgba(0,212,106,0.3)" : "var(--border-default)"}`,
+                        color: allSelected ? "#2563EB" : someSelected ? "#f59e0b" : "hsl(240 8% 52%)",
+                        border: `1px solid ${allSelected ? "rgba(37, 99, 235,0.3)" : "var(--border-default)"}`,
                       }}
                       title={allSelected ? "Desmarcar todas do módulo" : "Selecionar todas do módulo"}
                     >
@@ -337,15 +337,15 @@ export default function RolesPage() {
                           onClick={() => togglePerm(perm.id)}
                           className="flex items-center gap-2 p-2.5 rounded-xl text-left transition-all"
                           style={{
-                            background: isSelected ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-                            border: `1px solid ${isSelected ? "rgba(0,212,106,0.2)" : "var(--surface-2)"}`,
+                            background: isSelected ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+                            border: `1px solid ${isSelected ? "rgba(37, 99, 235,0.2)" : "var(--surface-2)"}`,
                           }}
                         >
                           <div
                             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
-                              background: isSelected ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
-                              border: `1px solid ${isSelected ? "rgba(0,212,106,0.3)" : "var(--border-strong)"}`,
+                              background: isSelected ? "rgba(37, 99, 235,0.15)" : "var(--surface-2)",
+                              border: `1px solid ${isSelected ? "rgba(37, 99, 235,0.3)" : "var(--border-strong)"}`,
                             }}
                           >
                             {isSelected && <Check className="w-3 h-3" style={{ color: "var(--green)" }} />}

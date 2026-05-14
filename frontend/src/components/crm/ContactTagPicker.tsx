@@ -16,7 +16,7 @@ import { crmApi } from "@/lib/api";
 
 type Tag = { id: string; name: string; color: string };
 
-const PRESET_COLORS = ["#00d46a", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+const PRESET_COLORS = ["#2563EB", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 export function ContactTagPicker({
   contactId,
@@ -33,7 +33,7 @@ export function ContactTagPicker({
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState(PRESET_COLORS[0] || "#00d46a");
+  const [newColor, setNewColor] = useState(PRESET_COLORS[0] || "#2563EB");
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Click outside fecha o dropdown.

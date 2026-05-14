@@ -136,8 +136,8 @@ export function ActivationTab({
               onClick={() => onChangeMode(p.id)}
               className="text-left rounded-2xl p-4 transition"
               style={{
-                background: active ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-                border: `1px solid ${active ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+                background: active ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+                border: `1px solid ${active ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
               }}
             >
               <div className="flex items-center gap-2 mb-1.5">
@@ -345,8 +345,8 @@ function ResponseStyleSection({
                 onClick={() => onChange({ ...style, pace: p.id })}
                 className="text-left rounded-xl p-3 transition"
                 style={{
-                  background: active ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
-                  border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                  background: active ? "rgba(37, 99, 235,0.06)" : "var(--surface-2)",
+                  border: `1px solid ${active ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                 }}
               >
                 <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.title}</p>
@@ -473,7 +473,7 @@ const TRIGGER_PRESETS: Array<{ id: TriggerMode; title: string; desc: string; ico
   { id: "webhook", title: "Por webhook (integração)",     desc: "Não responde mensagens normais. Inicia conversa ao receber POST no endpoint dedicado.",     icon: Webhook },
 ];
 
-// 15 tipos cobrindo todo o leque inbound dos canais que a Uniq integra
+// 15 tipos cobrindo todo o leque inbound dos canais que a Qchat integra
 // (WhatsApp pessoal, WABA, Instagram). Renderizado em grid 5×3 — ordem
 // importa: agrupado por afinidade (texto → mídia → engajamento → comércio).
 const MESSAGE_TYPE_OPTIONS: Array<{ id: string; label: string; desc: string }> = [
@@ -560,8 +560,8 @@ function TriggerSection({
               onClick={() => onChange({ ...trigger, mode: p.id })}
               className="text-left rounded-2xl p-4 transition"
               style={{
-                background: active ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-                border: `1px solid ${active ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+                background: active ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+                border: `1px solid ${active ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
               }}
             >
               <div className="flex items-center gap-2 mb-1.5">
@@ -597,8 +597,8 @@ function TriggerSection({
                   title={option.desc}
                   className="text-left rounded-lg p-2 transition"
                   style={{
-                    background: active ? "rgba(0,212,106,0.07)" : "var(--surface-3)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.28)" : "var(--surface-border)"}`,
+                    background: active ? "rgba(37, 99, 235,0.07)" : "var(--surface-3)",
+                    border: `1px solid ${active ? "rgba(37, 99, 235,0.28)" : "var(--surface-border)"}`,
                   }}
                 >
                   <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>{option.label}</p>
@@ -635,7 +635,7 @@ function TriggerSection({
               type="button"
               onClick={addKeyword}
               className="text-[11px] px-2 py-1.5 rounded-md inline-flex items-center gap-1"
-              style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+              style={{ background: "rgba(37, 99, 235,0.1)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.25)" }}
             >
               <Plus className="w-3 h-3" />
               Adicionar

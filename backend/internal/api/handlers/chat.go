@@ -859,7 +859,7 @@ func isOperationalRequest(msg string) bool {
 
 // buildAgentSystemPrompt returns the system prompt for the operational agent.
 func buildAgentSystemPrompt() string {
-	return `Você é a Uniq AI, assistente operacional da plataforma Uniq Chat.
+	return `Você é a Uniq AI, assistente operacional da plataforma Qchat.
 
 Você tem acesso a ferramentas que operam diretamente sobre todos os módulos da plataforma:
 - CRM: contatos, empresas, deals, funis/pipelines

@@ -28,15 +28,15 @@ function fmtDateTime(s: string) {
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   draft:     { label: "Rascunho",  color: "#64748b", bg: "rgba(100,116,139,0.1)", icon: Clock },
   scheduled: { label: "Agendada",  color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  icon: Calendar },
-  running:   { label: "Executando",color: "#00d46a", bg: "rgba(0,212,106,0.1)",   icon: Loader2 },
+  running:   { label: "Executando",color: "#2563EB", bg: "rgba(37, 99, 235,0.1)",   icon: Loader2 },
   paused:    { label: "Pausada",   color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  icon: Pause },
-  completed: { label: "Concluída", color: "#00d46a", bg: "rgba(0,212,106,0.1)",   icon: CheckCircle2 },
+  completed: { label: "Concluída", color: "#2563EB", bg: "rgba(37, 99, 235,0.1)",   icon: CheckCircle2 },
   failed:    { label: "Cancelada", color: "#ef4444", bg: "rgba(239,68,68,0.1)",   icon: AlertCircle },
 };
 
 const RECIPIENT_STATUS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pendente", color: "#64748b" },
-  sent:    { label: "Enviado",  color: "#00d46a" },
+  sent:    { label: "Enviado",  color: "#2563EB" },
   failed:  { label: "Falhou",   color: "#ef4444" },
 };
 
@@ -430,7 +430,7 @@ function CampaignDiagnoseButton({ campaignId }: { campaignId: string }) {
               </div>
               <span className="px-2 py-1 rounded-lg text-[11px] font-semibold"
                 style={data.would_run
-                  ? { background: "rgba(0,212,106,0.10)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
+                  ? { background: "rgba(37, 99, 235,0.10)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.25)" }
                   : { background: "rgba(248,113,113,0.10)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" }}>
                 {data.would_run ? "Pronta pra rodar" : "Bloqueada"}
               </span>
@@ -438,9 +438,9 @@ function CampaignDiagnoseButton({ campaignId }: { campaignId: string }) {
             <div className="space-y-2 mt-4">
               {data.checks.map((ck) => (
                 <div key={ck.check} className="flex items-start gap-2.5 px-3 py-2 rounded-lg"
-                  style={{ background: ck.ok ? "rgba(0,212,106,0.04)" : "rgba(248,113,113,0.04)",
-                          border: `1px solid ${ck.ok ? "rgba(0,212,106,0.15)" : "rgba(248,113,113,0.20)"}` }}>
-                  <span className="text-sm flex-shrink-0 mt-0.5" style={{ color: ck.ok ? "#00d46a" : "#f87171" }}>
+                  style={{ background: ck.ok ? "rgba(37, 99, 235,0.04)" : "rgba(248,113,113,0.04)",
+                          border: `1px solid ${ck.ok ? "rgba(37, 99, 235,0.15)" : "rgba(248,113,113,0.20)"}` }}>
+                  <span className="text-sm flex-shrink-0 mt-0.5" style={{ color: ck.ok ? "#2563EB" : "#f87171" }}>
                     {ck.ok ? "✓" : "✗"}
                   </span>
                   <div className="min-w-0">

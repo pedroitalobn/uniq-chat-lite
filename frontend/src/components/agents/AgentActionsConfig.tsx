@@ -1,7 +1,7 @@
 "use client";
 
 // AgentActionsConfig — toggles para as ações nativas que o agente pode
-// executar dentro da Uniq durante uma conversa (add_tag, criar tarefa,
+// executar dentro da  Qchat durante uma conversa (add_tag, criar tarefa,
 // agendar reunião, etc) + política de confirmação. Os toggles são
 // persistidos como entradas do array app_access (type="action") pra
 // reusar a infra existente; o backend lê via parseEnabledTools.
@@ -162,8 +162,8 @@ export function AgentActionsConfig({
                 onClick={() => onChangeConfirmation(opt.value as any)}
                 className="text-left rounded-lg p-2.5 transition"
                 style={{
-                  background: active ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
-                  border: `1px solid ${active ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+                  background: active ? "rgba(37, 99, 235,0.08)" : "var(--surface-3)",
+                  border: `1px solid ${active ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
                 }}
               >
                 <p className="text-xs font-medium" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>{opt.label}</p>
@@ -192,8 +192,8 @@ export function AgentActionsConfig({
                 onClick={() => toggle(a.id)}
                 className="text-left rounded-xl p-3 transition flex items-start gap-2"
                 style={{
-                  background: on ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
-                  border: `1px solid ${on ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                  background: on ? "rgba(37, 99, 235,0.06)" : "var(--surface-2)",
+                  border: `1px solid ${on ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                 }}
               >
                 <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: on ? "var(--green)" : "var(--text-3)" }} />
@@ -204,7 +204,7 @@ export function AgentActionsConfig({
                 <span
                   className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
                   style={{
-                    background: on ? "rgba(0,212,106,0.15)" : "var(--surface-3)",
+                    background: on ? "rgba(37, 99, 235,0.15)" : "var(--surface-3)",
                     color: on ? "var(--green)" : "var(--text-3)",
                   }}
                 >

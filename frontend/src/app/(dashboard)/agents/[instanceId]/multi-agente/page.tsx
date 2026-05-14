@@ -246,7 +246,7 @@ function TimelineNode({
             className="ml-auto inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full"
             style={
               isActive
-                ? { background: "rgba(0,212,106,0.10)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.20)" }
+                ? { background: "rgba(37, 99, 235,0.10)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.20)" }
                 : { background: "var(--surface-2)", color: "var(--text-4)", border: "1px solid var(--surface-border)" }
             }
           >

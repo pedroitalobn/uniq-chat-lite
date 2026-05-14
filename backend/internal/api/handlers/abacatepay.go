@@ -535,7 +535,7 @@ func (h *AbacatePayHandler) createTransparentCheckout(plan models.Plan, external
 		Method: "PIX",
 		Data: abacatepayTransparentData{
 			Amount:      amount,
-			Description: fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
+			Description: fmt.Sprintf("Assinatura %s — Qchat", plan.Name),
 			ExternalID:  externalID,
 			Customer:    customer,
 			Metadata:    metadata,

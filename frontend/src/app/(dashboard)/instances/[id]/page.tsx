@@ -47,7 +47,7 @@ interface InstanceSafetyStatus {
 }
 
 const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; color: string }> = {
-  connected:    { label: "Conectado",    dot: "#00d46a", bg: "rgba(0,212,106,0.08)",   color: "#00d46a" },
+  connected:    { label: "Conectado",    dot: "#2563EB", bg: "rgba(37, 99, 235,0.08)",   color: "#2563EB" },
   connecting:   { label: "Conectando",   dot: "#fbbf24", bg: "rgba(251,191,36,0.08)",  color: "#fbbf24" },
   disconnected: { label: "Desconectado", dot: "#64748b", bg: "rgba(100,116,139,0.08)", color: "#64748b" },
   banned:       { label: "Banido",       dot: "#ef4444", bg: "rgba(239,68,68,0.08)",   color: "#ef4444" },
@@ -675,7 +675,7 @@ function LogsTab({ instanceId }: { instanceId: string }) {
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
-          <MessageSquareText className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <MessageSquareText className="w-4 h-4" style={{ color: "#2563EB" }} />
           <span className="font-medium text-sm" style={{ color: "var(--text-1)" }}>Últimas mensagens</span>
         </div>
         {messages.length === 0 ? (
@@ -689,8 +689,8 @@ function LogsTab({ instanceId }: { instanceId: string }) {
               <div key={msg.id} className="p-3.5 flex items-start gap-3">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{
-                    background: msg.direction === "in" ? "rgba(96,165,250,0.08)" : "rgba(0,212,106,0.08)",
-                    border: msg.direction === "in" ? "1px solid rgba(96,165,250,0.15)" : "1px solid rgba(0,212,106,0.15)",
+                    background: msg.direction === "in" ? "rgba(96,165,250,0.08)" : "rgba(37, 99, 235,0.08)",
+                    border: msg.direction === "in" ? "1px solid rgba(96,165,250,0.15)" : "1px solid rgba(37, 99, 235,0.15)",
                   }}>
                   {msg.direction === "in"
                     ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
@@ -921,7 +921,7 @@ function GroupJoinPanel({ instance, instanceId, cardStyle }: { instance: Instanc
     <div className="rounded-2xl" style={cardStyle}>
       <div className="p-4 flex flex-wrap items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
         <div className="flex items-center gap-2">
-          <LogIn className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <LogIn className="w-4 h-4" style={{ color: "#2563EB" }} />
           <span className="font-medium text-sm" style={valText}>Entrar em grupos por link</span>
         </div>
         <div className="flex items-center gap-2">
@@ -970,7 +970,7 @@ function GroupJoinPanel({ instance, instanceId, cardStyle }: { instance: Instanc
             onClick={() => joinLinksMutation.mutate()}
             disabled={joinLinksMutation.isPending || !joinCSV.trim() || instance.status !== "connected"}
             className="w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all disabled:opacity-50"
-            style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
+            style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.25)", color: "#2563EB" }}
           >
             {joinLinksMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
             Adicionar à fila
@@ -981,7 +981,7 @@ function GroupJoinPanel({ instance, instanceId, cardStyle }: { instance: Instanc
         <div className="px-4 pb-4">
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
             {joinJobs.slice(0, 8).map((job) => {
-              const tone = job.status === "joined" ? "#00d46a" : job.status === "failed" ? "#ef4444" : job.status === "running" ? "#60a5fa" : "#f59e0b";
+              const tone = job.status === "joined" ? "#2563EB" : job.status === "failed" ? "#ef4444" : job.status === "running" ? "#60a5fa" : "#f59e0b";
               return (
                 <div key={job.id} className="p-3 flex items-center gap-3 border-b last:border-b-0" style={{ borderColor: "var(--border-default)" }}>
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tone }} />
@@ -1064,7 +1064,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [listChoices, setListChoices] = useState("[Seção 1]\nItem 1|id1|Descrição 1\nItem 2|id2|Descrição 2\n[Seção 2]\nItem 3|id3");
   // carousel
   const [carouselText, setCarouselText] = useState("Conheça nossos planos — escolha o que cabe no seu time");
-  const [carouselFooter, setCarouselFooter] = useState("Uniq Chat • Atendimento omnichannel");
+  const [carouselFooter, setCarouselFooter] = useState("Qchat • Atendimento omnichannel");
   const [carouselChoices, setCarouselChoices] = useState("[Plano Starter]\n{https://picsum.photos/seed/uniq-starter/720/480}\nConhecer Starter|https://uniq.chat/precos\nFalar com vendas|call:+551140002025\n[Plano Pro]\n{https://picsum.photos/seed/uniq-pro/720/480}\nAssinar Pro|https://uniq.chat/checkout/pro\nAgendar demo|https://uniq.chat/demo");
   const [lookupTarget, setLookupTarget] = useState("");
   const [contactLookup, setContactLookup] = useState<InstanceContactLookup | null>(null);
@@ -1710,7 +1710,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       <span
                         className="text-[10px] font-medium px-2 py-0.5 rounded-full"
                         style={contactLookup.exists
-                          ? { background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }
+                          ? { background: "rgba(37, 99, 235,0.1)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.2)" }
                           : { background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
                       >
                         {contactLookup.exists ? "Existe no WhatsApp" : "Não encontrado"}
@@ -1750,9 +1750,9 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <button
               onClick={() => setShowQR(true)}
               className="flex items-center justify-center gap-2 text-sm font-medium py-2.5 px-4 rounded-xl transition-all"
-              style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)", color: "var(--green)" }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.14)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.08)")}
+              style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)", color: "var(--green)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(37, 99, 235,0.14)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "rgba(37, 99, 235,0.08)")}
             >
               <QrCode className="w-4 h-4" />
               QR Code
@@ -1966,7 +1966,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 <input value={pixKey} onChange={e => setPixKey(e.target.value)}
                   placeholder="Chave PIX" className="input-field sm:col-span-2" />
               </div>
-              <div className="rounded-lg p-2.5" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)" }}>
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                 <p className="text-[10px]" style={{ color: "rgb(110 231 183)" }}>
                   Card "Pagar" interativo — o cliente confirma o valor no app. Default exibido: R$ 0,01 (limitação atual do protocolo).
                 </p>
@@ -2539,7 +2539,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button onClick={() => copy(g.invite_link!, g.jid)}
                           className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg transition-all"
-                          style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}>
+                          style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.2)", color: "#2563EB" }}>
                           {copiedJid === g.jid ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                           {copiedJid === g.jid ? "Copiado" : "Link"}
                         </button>
@@ -2768,7 +2768,7 @@ export default function InstanceDetailPage() {
   const safetyIsCritical = safetyState === "critical";
   const safetyTone = safetyIsCritical
     ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444", label: "Crítico", detail: safety?.incident?.message || "Envios e automações pausados para revisão." }
-    : { bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.18)", color: "#00d46a", label: "Normal", detail: "Monitorando inbox, campanhas, jornadas e eventos silenciosos em tempo real." };
+    : { bg: "rgba(37, 99, 235,0.08)", border: "rgba(37, 99, 235,0.18)", color: "#2563EB", label: "Normal", detail: "Monitorando inbox, campanhas, jornadas e eventos silenciosos em tempo real." };
 
   return (
     <div className="space-y-7">
@@ -2870,7 +2870,7 @@ export default function InstanceDetailPage() {
                 onClick={() => resumeSafetyMutation.mutate()}
                 disabled={resumeSafetyMutation.isPending}
                 className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
+                style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.25)", color: "#2563EB" }}
               >
                 {resumeSafetyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Retomar instância
@@ -2903,8 +2903,8 @@ export default function InstanceDetailPage() {
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: isConnected ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
-                  border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid var(--border-default)",
+                  background: isConnected ? "rgba(37, 99, 235,0.1)" : "var(--surface-2)",
+                  border: isConnected ? "1px solid rgba(37, 99, 235,0.2)" : "1px solid var(--border-default)",
                 }}
               >
                 <Smartphone className="w-4 h-4" style={{ color: isConnected ? "var(--green)" : "hsl(240 8% 38%)" }} />
@@ -3210,7 +3210,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
               <button key={s.id} onClick={() => setSource(s.id as any)}
                 className="flex-1 py-2 text-xs font-medium rounded-lg transition-colors"
                 style={source === s.id
-                  ? { background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }
+                  ? { background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)", color: "#2563EB" }
                   : { background: "hsl(240 12% 10%)", border: "1px solid var(--border)", color: "var(--text-3)" }
                 }>
                 {s.label}

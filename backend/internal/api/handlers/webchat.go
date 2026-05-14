@@ -130,7 +130,7 @@ func (h *WebChatHandler) GetEmbedSnippet(c *fiber.Ctx) error {
 	}
 
 	token := inst.Token
-	snippet := fmt.Sprintf(`<!-- Uniq Chat WebChat Widget -->
+	snippet := fmt.Sprintf(`<!-- Qchat WebChat Widget -->
 <script>
 (function(){
   var t="%s",u="%s/v1/public/webchat/",w=document.createElement("div");
@@ -163,14 +163,14 @@ func (h *WebChatHandler) PublicGetConfig(c *fiber.Ctx) error {
 			// Return defaults.
 			return c.JSON(fiber.Map{
 				"display_name":     inst.Name,
-				"primary_color":    "#00d46a",
+				"primary_color":    "#2563EB",
 				"position":         "bottom-right",
 				"greeting":         "Olá! Como posso ajudar?",
 				"instance_id":      inst.ID,
 				"destination_type": "inbox",
 				"badge_style":      "bubble",
 				"badge_icon":       "",
-				"badge_color":      "#00d46a",
+				"badge_color":      "#2563EB",
 				"offset_x":         20,
 				"offset_y":         20,
 				"border_radius":    9999,

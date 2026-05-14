@@ -65,7 +65,7 @@ const PROVIDERS = [
   { id: "minimax", name: "MiniMax", description: "Modelos da MiniMax", color: "#00bcd4", bg: "rgba(0,188,212,0.08)", border: "rgba(0,188,212,0.2)", models: ["MiniMax-Text-01", "abab6.5-chat"] },
   { id: "manus", name: "Manus", description: "Modelos da Manus", color: "#eab308", bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.2)", models: ["manus-base"] },
   { id: "n8n", name: "n8n", description: "Automações e workflows", color: "#ea5e0e", bg: "rgba(234,94,14,0.08)", border: "rgba(234,94,14,0.2)", models: [], hasBaseURL: true },
-  { id: "kilo", name: "Kilo", description: "LLM Kilo - Modelo avançado", color: "#00d46a", bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.2)", models: ["kilo/kilo-auto/balanced"] },
+  { id: "kilo", name: "Kilo", description: "LLM Kilo - Modelo avançado", color: "#2563EB", bg: "rgba(37, 99, 235,0.08)", border: "rgba(37, 99, 235,0.2)", models: ["kilo/kilo-auto/balanced"] },
   { id: "custom", name: "Custom (OpenAI-compatible)", description: "Qualquer API compatível com OpenAI — Ollama, Groq, Together, LiteLLM…", color: "#94a3b8", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.2)", models: [], hasBaseURL: true },
 ] as const;
 
@@ -182,7 +182,7 @@ export default function IntegrationsPage() {
                     )}
                     style={{
                       borderColor: "var(--border-subtle)",
-                      background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
+                      background: isActive ? "rgba(37, 99, 235,0.10)" : "transparent",
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--surface-3)"; }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
@@ -229,8 +229,8 @@ export default function IntegrationsPage() {
   );
 }
 
-// ─── Uniq AI Card ─────────────────────────────────────────────────────────────
-function UniqAICard() {
+// ─── QChat AI Card ─────────────────────────────────────────────────────────────
+function QChatAICard() {
   const { data } = useQuery<PlatformAIConfig[]>({
     queryKey: ["integrations", "platform-ai"],
     queryFn: () => platformAIApi.listPublic().then((r) => r.data),
@@ -260,13 +260,13 @@ function UniqAICard() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-              {activeConfigs.length > 1 ? `Uniq AI (${activeConfigs.length} configs)` : (data_.name || "Uniq AI")}
+              {activeConfigs.length > 1 ? `QChat AI (${activeConfigs.length} configs)` : (data_.name || "QChat AI")}
             </p>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
               style={{
-                background: "rgba(0,212,106,0.15)",
-                border: "1px solid rgba(0,212,106,0.25)",
+                background: "rgba(37, 99, 235,0.15)",
+                border: "1px solid rgba(37, 99, 235,0.25)",
                 color: "#4ade80",
               }}
             >
@@ -315,7 +315,7 @@ function LLMSection() {
 
   return (
     <div className="space-y-6">
-      <UniqAICard />
+      <QChatAICard />
 
       {/* Conectores especiais */}
       <div>
@@ -365,7 +365,7 @@ function LLMSection() {
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Modelos de IA</p>
           <button onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)", color: "var(--green)" }}>
+            style={{ background: "rgba(37, 99, 235,0.10)", border: "1px solid rgba(37, 99, 235,0.20)", color: "var(--green)" }}>
             <Plus className="w-3.5 h-3.5" /> Adicionar LLM
           </button>
         </div>
@@ -377,7 +377,7 @@ function LLMSection() {
             <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>Conecte Claude, GPT-4o, Gemini e outros para usar nos agentes de IA.</p>
             <button onClick={() => setShowAddModal(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
-              style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)", color: "var(--green)" }}>
+              style={{ background: "rgba(37, 99, 235,0.10)", border: "1px solid rgba(37, 99, 235,0.20)", color: "var(--green)" }}>
               <Plus className="w-4 h-4" /> Adicionar primeiro LLM
             </button>
           </div>
@@ -415,10 +415,10 @@ function IntegrationCard({ integration }: { integration: Integration }) {
         <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{provider?.name} · {integration.models?.length || 0} modelo(s)</p>
       </div>
       <span className="px-2 py-0.5 text-[10px] font-medium" style={{
-        background: integration.is_active ? "rgba(0,212,106,0.12)" : "rgba(100,116,139,0.12)",
+        background: integration.is_active ? "rgba(37, 99, 235,0.12)" : "rgba(100,116,139,0.12)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        border: integration.is_active ? "1px solid rgba(0,212,106,0.25)" : "1px solid rgba(100,116,139,0.20)",
+        border: integration.is_active ? "1px solid rgba(37, 99, 235,0.25)" : "1px solid rgba(100,116,139,0.20)",
         borderRadius: "10px",
         color: integration.is_active ? "#4ade80" : "#94a3b8",
       }}>{integration.is_active ? "Ativo" : "Inativo"}</span>
@@ -450,7 +450,7 @@ function APIKeysSection() {
       {/* Create key */}
       <div className="rounded-2xl p-5 space-y-4" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)" }}>
             <Key className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
           <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Criar nova chave</h2>
@@ -465,7 +465,7 @@ function APIKeysSection() {
         </div>
 
         {createdKey && (
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.15)" }}>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(37, 99, 235,0.05)", border: "1px solid rgba(37, 99, 235,0.15)" }}>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
               <p className="text-sm font-medium" style={{ color: "#86efac" }}>Chave <strong>{createdKey.name}</strong> criada! Copie agora — não será exibida novamente.</p>
@@ -618,15 +618,15 @@ function ProxiesSection() {
   return (
     <div className="space-y-6">
 
-      {/* ── Proxies Uniq ── */}
+      {/* ── Proxies  Qchat ── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Proxies Uniq</h3>
-          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>ativos</span>
+          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Proxies Qchat</h3>
+          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "rgba(37, 99, 235,0.1)", color: "var(--green)" }}>ativos</span>
         </div>
         <div className="rounded-2xl border p-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
           <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>
-            Proxies residenciais gerenciados pela Uniq. Disponíveis automaticamente em todos os servers.
+            Proxies residenciais gerenciados pela Qchat. Disponíveis automaticamente em todos os servers.
           </p>
           {loadingPlatform ? (
             <div className="flex items-center gap-2">
@@ -788,7 +788,7 @@ function ProxiesSection() {
             {testResult && (
               <div className="p-3 rounded-xl text-xs"
                 style={{
-                  background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
+                  background: testResult.success ? "rgba(37, 99, 235,0.08)" : "rgba(239,68,68,0.08)",
                   color: testResult.success ? "var(--green)" : "#f87171",
                 }}>
                 {testResult.success
@@ -987,7 +987,7 @@ function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Agents Section (Apps that consume Uniq API) ──────────────────────────────
+// ─── Agents Section (Apps that consume  Qchat API) ──────────────────────────────
 function AgentsSection() {
   const { data: keys = [] } = useQuery<APIKey[]>({ queryKey: ["api-keys"], queryFn: () => apiKeysApi.list().then(r => r.data) });
   const { data: instances = [] } = useQuery<any[]>({ queryKey: ["instances"], queryFn: () => instancesApi.list().then(r => r.data) });
@@ -997,7 +997,7 @@ function AgentsSection() {
     {
       id: "claude_desktop",
       name: "Claude Desktop",
-      description: "Use Uniq via MCP para ferramentas de WhatsApp",
+      description: "Use  Qchat via MCP para ferramentas de WhatsApp",
       icon: "🧠",
       docs: "https://modelcontextprotocol.io",
       setup: "Configure o MCP server no arquivo settings.json",
@@ -1006,7 +1006,7 @@ function AgentsSection() {
     {
       id: "open_code",
       name: "Open Code (VSCode)",
-      description: "VSCode com IA que conecta ao Uniq para WhatsApp",
+      description: "VSCode com IA que conecta ao  Qchat para WhatsApp",
       icon: "💻",
       docs: "https://github.com/omercnet/vscode-acp",
       setup: "Use VSCode ACP extension + configure endpoint",
@@ -1038,7 +1038,7 @@ function AgentsSection() {
           </div>
           <div>
             <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Apps Agents</h2>
-            <p className="text-xs" style={{ color: "var(--text-3)" }}>Conecte apps de IA para consumir a API do Uniq</p>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Conecte apps de IA para consumir a API do Qchat</p>
           </div>
         </div>
 

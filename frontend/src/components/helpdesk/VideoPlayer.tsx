@@ -87,7 +87,7 @@ export function VideoPlayer({
       style={{
         borderRadius: 14,
         overflow: "hidden",
-        "--plyr-color-main": "#00d46a",
+        "--plyr-color-main": "#2563EB",
         ...style,
       } as CSSProperties}
     >

@@ -16,7 +16,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 // Button is the single primitive every page should use. Centraliza o
 // arredondamento (rounded-lg), altura consistente, estado ativo/desabilitado
-// e o accent verde Uniq (var(--green)). Evita a mistura de bg-blue-600 /
+// e o accent azul Qchat (var(--green)). Evita a mistura de bg-blue-600 /
 // bg-white que apareceu em algumas páginas do inbox/crm.
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
@@ -43,9 +43,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const variantStyle: Record<Variant, React.CSSProperties> = {
     primary: {
-      background: "var(--green, #00d46a)",
+      background: "var(--green, #2563EB)",
       color: "#03170a",
-      border: "1px solid rgba(0,212,106,0.5)",
+      border: "1px solid rgba(37, 99, 235,0.5)",
       boxShadow: "0 1px 0 rgba(0,0,0,0.12)",
       fontWeight: 600,
     },

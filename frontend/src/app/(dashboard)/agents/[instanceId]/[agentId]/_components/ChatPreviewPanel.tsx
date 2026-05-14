@@ -145,8 +145,8 @@ export function ChatPreviewPanel({
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.05))",
-              border: "1px solid rgba(0,212,106,0.30)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.05))",
+              border: "1px solid rgba(37, 99, 235,0.30)",
               color: "var(--green)",
             }}
           >

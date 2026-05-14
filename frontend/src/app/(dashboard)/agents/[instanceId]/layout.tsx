@@ -61,8 +61,8 @@ export default function AgentInstanceLayout({ children }: { children: React.Reac
             style={
               isMultiAgent
                 ? {
-                    background: "rgba(0,212,106,0.12)",
-                    border: "1px solid rgba(0,212,106,0.30)",
+                    background: "rgba(37, 99, 235,0.12)",
+                    border: "1px solid rgba(37, 99, 235,0.30)",
                     color: "var(--green)",
                   }
                 : {

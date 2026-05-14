@@ -488,7 +488,7 @@ func (h *HelpDeskHandler) GetConfig(c *fiber.Ctx) error {
 		cfg = models.HelpDeskConfig{
 			WorkspaceID:   wsID,
 			Title:         ws.Name + " · Central de Ajuda",
-			PrimaryColor:  "#00d46a",
+			PrimaryColor:  "#2563EB",
 			WidgetEnabled: true,
 			// Persiste um slug humano logo na criação (preferindo
 			// workspace.slug). Sem isso, o link compartilhado caía no
@@ -539,7 +539,7 @@ func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
 
 	var cfg models.HelpDeskConfig
 	if err := h.db.Where("workspace_id = ?", wsID).First(&cfg).Error; err != nil {
-		cfg = models.HelpDeskConfig{WorkspaceID: wsID, PrimaryColor: "#00d46a", WidgetEnabled: true}
+		cfg = models.HelpDeskConfig{WorkspaceID: wsID, PrimaryColor: "#2563EB", WidgetEnabled: true}
 		h.db.Create(&cfg)
 	}
 
@@ -679,7 +679,7 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"title":              ws.Name + " · Central de Ajuda",
 			"description":        "",
-			"primary_color":      "#00d46a",
+			"primary_color":      "#2563EB",
 			"logo_url":           "",
 			"widget_enabled":     true,
 			"theme_mode":         "dark",

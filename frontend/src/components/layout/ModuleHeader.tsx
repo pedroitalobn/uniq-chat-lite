@@ -13,8 +13,8 @@ export function ModuleHeader({
   title,
   subtitle,
   color = "var(--green)",
-  bg = "rgba(0,212,106,0.12)",
-  border = "rgba(0,212,106,0.25)",
+  bg = "rgba(37, 99, 235,0.12)",
+  border = "rgba(37, 99, 235,0.25)",
 }: {
   icon: LucideIcon;
   title: string;

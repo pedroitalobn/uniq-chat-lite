@@ -1,4 +1,4 @@
-// CRM v2 design tokens — preservam a identidade Uniq.chat (tons HSL escuros,
+// CRM v2 design tokens — preservam a identidade Qchat (tons HSL escuros,
 // accent verde, cantos arredondados). Todos os componentes do CRM usam estes
 // valores em inline-styles para evitar depender de tailwind classes custom.
 
@@ -21,11 +21,11 @@ export const uniq = {
   textFaint: "var(--text-4)",
   textDim: "var(--text-3)",
 
-  // Accent (verde Uniq)
+  // Accent (azul Qchat)
   green: "var(--green)",
-  greenBg: "rgba(0,212,106,0.08)",
-  greenBgSoft: "rgba(0,212,106,0.04)",
-  greenBorder: "rgba(0,212,106,0.25)",
+  greenBg: "rgba(37, 99, 235,0.08)",
+  greenBgSoft: "rgba(37, 99, 235,0.04)",
+  greenBorder: "rgba(37, 99, 235,0.25)",
 
   // Status de deal
   statusOpen: "#3b82f6",

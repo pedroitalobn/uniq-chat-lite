@@ -79,7 +79,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   elevenlabs: "ElevenLabs",
   qwen_tts: "Qwen TTS",
   openai_tts: "OpenAI TTS",
-  uniq: "Uniq Voice",
+  uniq: "Qchat Voice",
 };
 
 // Voz do agente: seleção rápida + Voice Studio embutido. O Studio reaproveita
@@ -140,7 +140,7 @@ export function VoiceCard({ form, update }: Props) {
       return;
     }
     if (voice.source === "uniq") {
-      toast.info("Essa voz Uniq Voice não possui preview público configurado.");
+      toast.info("Essa voz Qchat Voice não possui preview público configurado.");
       return;
     }
     setTestingVoice(voice.id);
@@ -313,7 +313,7 @@ export function VoiceCard({ form, update }: Props) {
                               {voice.name}
                             </span>
                             <span className="block text-[10px] truncate" style={{ color: "var(--text-3)" }}>
-                              {voice.source === "uniq" ? "Uniq Voice" : PROVIDER_LABEL[voice.provider || ""] || voice.provider}
+                              {voice.source === "uniq" ? "Qchat Voice" : PROVIDER_LABEL[voice.provider || ""] || voice.provider}
                               {[voice.language, voice.gender, voice.category].filter(Boolean).length > 0
                                 ? ` · ${[voice.language, voice.gender, voice.category].filter(Boolean).join(" · ")}`
                                 : ""}
@@ -662,7 +662,7 @@ function VoiceStudioModal({
                   <div className="flex items-center gap-2 rounded-lg px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)" }}>
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
-                        Uniq Voice
+                        Qchat Voice
                       </p>
                       <p className="text-[9px]" style={{ color: "#f59e0b" }}>
                         Presetado pela plataforma
@@ -715,7 +715,7 @@ function VoiceStudioModal({
                   style={inputStyle}
                   className="mt-3"
                 >
-                  <option value="uniq">Uniq Voice - provider da plataforma</option>
+                  <option value="uniq">Qchat Voice - provider da plataforma</option>
                   {elevenLabsProviders.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} - ElevenLabs próprio
@@ -785,7 +785,7 @@ function parseUniqVoiceOptions(platformVoice?: PlatformVoiceConfig): VoiceOption
         if (!externalId) return null;
         return {
           id: `uniq:${externalId}`,
-          name: voice.name || `Uniq Voice ${idx + 1}`,
+          name: voice.name || `Qchat Voice ${idx + 1}`,
           source: "uniq" as const,
           provider: "uniq",
           language: voice.language,

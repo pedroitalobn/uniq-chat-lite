@@ -63,8 +63,8 @@ export default function CampaignJourneyPanel({ contactId }: CampaignJourneyPanel
         className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
-            <Megaphone className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)" }}>
+            <Megaphone className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-1)" }}>Campanhas & Jornadas</h3>
@@ -92,7 +92,7 @@ export default function CampaignJourneyPanel({ contactId }: CampaignJourneyPanel
                     <Link
                       href="/campaigns/new"
                       className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md transition-all hover:brightness-110"
-                      style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)", color: "#00d46a" }}
+                      style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)", color: "#2563EB" }}
                     >
                       <Plus className="w-3 h-3" />
                       Nova
@@ -108,7 +108,7 @@ export default function CampaignJourneyPanel({ contactId }: CampaignJourneyPanel
                       className="flex items-center gap-2 p-2 rounded-lg transition-all hover:bg-white/[0.03]"
                       style={{ background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)" }}
                     >
-                      <Megaphone className="w-3 h-3 flex-shrink-0" style={{ color: "#00d46a" }} />
+                      <Megaphone className="w-3 h-3 flex-shrink-0" style={{ color: "#2563EB" }} />
                       <span className="text-[11px] truncate" style={{ color: "var(--text-1)" }}>{c.name}</span>
                     </Link>
                   ))}

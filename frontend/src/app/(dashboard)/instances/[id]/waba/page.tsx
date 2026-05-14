@@ -116,7 +116,7 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
   const safetyIsCritical = safetyState === "critical";
   const safetyTone = safetyIsCritical
     ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444", label: "Crítico", detail: safety?.incident?.message || "Envios e automações pausados para revisão." }
-    : { bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.18)", color: "var(--green)", label: "Normal", detail: "Monitorando inbox, campanhas e eventos da instância em tempo real." };
+    : { bg: "rgba(37, 99, 235,0.08)", border: "rgba(37, 99, 235,0.18)", color: "var(--green)", label: "Normal", detail: "Monitorando inbox, campanhas e eventos da instância em tempo real." };
 
   const subscribeMut = useMutation({
     mutationFn: () => wabaApi.subscribe(id),
@@ -1026,7 +1026,7 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
             <input value={footerText}
               maxLength={60}
               onChange={(e) => setFooterText(e.target.value)}
-              placeholder="Uniq Chat • Atendimento 24/7"
+              placeholder="Qchat • Atendimento 24/7"
               className="input-field w-full" />
           </div>
 
@@ -1276,7 +1276,7 @@ function TestSendSection({ instanceId, templates = [] }: {
 }) {
   const approved = templates.filter((t) => t.status === "APPROVED");
   const [to, setTo] = useState("");
-  const [text, setText] = useState("Olá! Mensagem de teste enviada via Uniq Chat.");
+  const [text, setText] = useState("Olá! Mensagem de teste enviada via Qchat.");
   const [sentId, setSentId] = useState("");
   const [mode, setMode] = useState<"text" | "template">("template");
   // selecionado como "name|language" pra cobrir templates do mesmo nome em idiomas diferentes
@@ -1462,7 +1462,7 @@ function TestSendSection({ instanceId, templates = [] }: {
       )}
       {mode === "template" && needsLocation && (
         <div className="mt-2 rounded-lg p-3 space-y-2"
-          style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.20)" }}>
+          style={{ background: "rgba(37, 99, 235,0.06)", border: "1px solid rgba(37, 99, 235,0.20)" }}>
           <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--green)" }}>
             Header · localização
           </p>
@@ -1638,8 +1638,8 @@ function PinChip({ pin }: { pin: string }) {
     <div
       className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-1 py-1"
       style={{
-        background: "rgba(0,212,106,0.10)",
-        border: "1px solid rgba(0,212,106,0.30)",
+        background: "rgba(37, 99, 235,0.10)",
+        border: "1px solid rgba(37, 99, 235,0.30)",
         color: "var(--green)",
       }}
       title="PIN 2FA do registro WABA — necessário pra reconectar este número no futuro"
@@ -1768,9 +1768,9 @@ function MessagesLogSection({ instanceId }: { instanceId: string }) {
               onClick={() => { setStatusFilter(s); setOffset(0); }}
               className="text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors"
               style={statusFilter === s ? {
-                background: "rgba(0,212,106,0.18)",
+                background: "rgba(37, 99, 235,0.18)",
                 color: "var(--green)",
-                border: "1px solid rgba(0,212,106,0.35)",
+                border: "1px solid rgba(37, 99, 235,0.35)",
               } : {
                 background: "var(--surface-3)",
                 color: "var(--text-2)",
@@ -1845,8 +1845,8 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
   pending:   { bg: "rgba(245,158,11,0.10)", color: "#f59e0b", label: "Pendente" },
   sent:      { bg: "rgba(96,165,250,0.10)", color: "#60a5fa", label: "Enviada" },
-  delivered: { bg: "rgba(0,212,106,0.10)",  color: "var(--green)", label: "Entregue" },
-  read:      { bg: "rgba(0,212,106,0.18)",  color: "var(--green)", label: "Lida" },
+  delivered: { bg: "rgba(37, 99, 235,0.10)",  color: "var(--green)", label: "Entregue" },
+  read:      { bg: "rgba(37, 99, 235,0.18)",  color: "var(--green)", label: "Lida" },
   failed:    { bg: "rgba(239,68,68,0.10)",  color: "#ef4444", label: "Falhou" },
 };
 

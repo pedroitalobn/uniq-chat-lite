@@ -263,14 +263,14 @@ function CheckoutContent() {
           }}
         >
           <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(0,212,106,0.08) 0%, transparent 60%)" }} />
+            style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(37, 99, 235,0.08) 0%, transparent 60%)" }} />
           <div className="relative">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
               className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
-              style={{ background: "rgba(0,212,106,0.15)" }}
+              style={{ background: "rgba(37, 99, 235,0.15)" }}
             >
               <CheckCircle className="w-10 h-10" style={{ color: "var(--green)" }} />
             </motion.div>
@@ -296,7 +296,7 @@ function CheckoutContent() {
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{
         background:
-          "radial-gradient(1200px 600px at 20% 0%, rgba(0,212,106,0.18), transparent 60%)," +
+          "radial-gradient(1200px 600px at 20% 0%, rgba(37, 99, 235,0.18), transparent 60%)," +
           "radial-gradient(900px 500px at 100% 100%, rgba(99,102,241,0.16), transparent 65%)," +
           "linear-gradient(180deg, hsl(240 22% 3%) 0%, hsl(240 18% 4%) 50%, hsl(240 22% 3%) 100%)",
       }}
@@ -319,7 +319,7 @@ function CheckoutContent() {
           className="absolute w-[350px] h-[350px] rounded-full"
           style={{
             bottom: "5%", right: "-8%",
-            background: "radial-gradient(circle, rgba(0,212,106,0.1) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(37, 99, 235,0.1) 0%, transparent 70%)",
             filter: "blur(40px)",
           }}
         />
@@ -383,7 +383,7 @@ function CheckoutContent() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-5"
               >
-                <div className="p-4 rounded-xl" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                <div className="p-4 rounded-xl" style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>{checkoutData?.plan_name || "Plano Pro"}</p>
@@ -470,8 +470,8 @@ function CheckoutContent() {
                     onClick={copyPixCode}
                     className="w-full text-xs py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
                     style={{
-                      background: copied ? "rgba(0,212,106,0.2)" : "rgba(14,165,233,0.12)",
-                      color: copied ? "#00d46a" : "#0ea5e9",
+                      background: copied ? "rgba(37, 99, 235,0.2)" : "rgba(14,165,233,0.12)",
+                      color: copied ? "#2563EB" : "#0ea5e9",
                     }}
                   >
                     <AnimatePresence mode="wait">
@@ -489,7 +489,7 @@ function CheckoutContent() {
                 </div>
 
                 {/* Total */}
-                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
+                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(37, 99, 235,0.08)" }}>
                   <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
                   <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
                     R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}
@@ -560,7 +560,7 @@ function CheckoutContent() {
                   </motion.button>
                 )}
 
-                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
+                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(37, 99, 235,0.08)" }}>
                   <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
                   <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
                     R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}
@@ -663,7 +663,7 @@ function CheckoutContent() {
                   </AnimatePresence>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
+                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(37, 99, 235,0.08)" }}>
                   <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
                   <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
                     R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}

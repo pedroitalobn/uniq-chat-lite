@@ -48,7 +48,7 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 
 const STATUS_BADGE: Record<HelpDeskArticle["status"], CSSProperties> = {
   draft: { background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" },
-  published: { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" },
+  published: { background: "rgba(37, 99, 235,0.12)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.20)" },
   archived: { background: "rgba(255,191,36,0.10)", color: "#fbbf24", border: "1px solid rgba(255,191,36,0.20)" },
 };
 
@@ -194,7 +194,7 @@ function NewCategoryDialog({ workspaceId, onClose }: { workspaceId: string; onCl
             </button>
             <button onClick={() => createMutation.mutate()} disabled={!name.trim() || createMutation.isPending}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)", opacity: !name.trim() || createMutation.isPending ? 0.6 : 1 }}>
+              style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.30)", opacity: !name.trim() || createMutation.isPending ? 0.6 : 1 }}>
               {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Criar
             </button>
@@ -277,11 +277,11 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
     onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao salvar."),
   });
 
-  const widgetColor = form.primary_color ?? "#00d46a";
+  const widgetColor = form.primary_color ?? "#2563EB";
   const widgetSlug = form.custom_slug || effectiveSlug;
   const widgetURL = publicURL || (typeof window !== "undefined" ? `${window.location.origin}/help/${widgetSlug}` : "");
 
-  const embedSnippet = `<!-- Uniq Help Center Widget -->
+  const embedSnippet = `<!--  Qchat Help Center Widget -->
 <script>
 (function(){
   var HELP_URL = "${widgetURL}";
@@ -315,7 +315,7 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
       <div className="space-y-5">
         <div className="rounded-2xl p-5 space-y-3" style={glassCard}>
           <div className="flex items-center gap-2 mb-1">
-            <Globe className="w-4 h-4" style={{ color: "#00d46a" }} />
+            <Globe className="w-4 h-4" style={{ color: "#2563EB" }} />
             <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>URL pública do Help Center</h3>
           </div>
           {publicURL ? (
@@ -323,7 +323,7 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
               <div className="flex-1 rounded-xl px-3 py-2.5 text-sm font-mono truncate"
                 style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>{publicURL}</div>
               <button onClick={copyURL} className="flex-shrink-0 p-2.5 rounded-xl transition-all"
-                style={{ background: copied ? "rgba(0,212,106,0.15)" : "var(--surface-3)", border: "1px solid var(--surface-border)", color: copied ? "#00d46a" : "var(--text-3)" }}>
+                style={{ background: copied ? "rgba(37, 99, 235,0.15)" : "var(--surface-3)", border: "1px solid var(--surface-border)", color: copied ? "#2563EB" : "var(--text-3)" }}>
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </button>
               <a href={publicURL} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 p-2.5 rounded-xl transition-all"
@@ -357,9 +357,9 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>Cor principal</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={form.primary_color ?? "#00d46a"} onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
+                <input type="color" value={form.primary_color ?? "#2563EB"} onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
                   style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid var(--surface-border)", background: "var(--surface-3)", cursor: "pointer", padding: 2 }} />
-                <input value={form.primary_color ?? "#00d46a"} onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))} style={{ ...inp, fontFamily: "monospace", flex: 1 }} />
+                <input value={form.primary_color ?? "#2563EB"} onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))} style={{ ...inp, fontFamily: "monospace", flex: 1 }} />
               </div>
             </div>
             <div>
@@ -376,7 +376,7 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
         <div className="flex justify-end">
           <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)", opacity: saveMutation.isPending ? 0.7 : 1 }}>
+            style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.30)", opacity: saveMutation.isPending ? 0.7 : 1 }}>
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Salvar configurações
           </button>
@@ -391,7 +391,7 @@ function IdentitySettings({ workspaceId }: { workspaceId: string }) {
               <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Embed widget</h3>
             </div>
             <button onClick={copySnippet} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{ background: snippetCopied ? "rgba(0,212,106,0.15)" : "var(--surface-3)", color: snippetCopied ? "#00d46a" : "var(--text-2)", border: "1px solid var(--surface-border)" }}>
+              style={{ background: snippetCopied ? "rgba(37, 99, 235,0.15)" : "var(--surface-3)", color: snippetCopied ? "#2563EB" : "var(--text-2)", border: "1px solid var(--surface-border)" }}>
               {snippetCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
               {snippetCopied ? "Copiado!" : "Copiar"}
             </button>
@@ -452,14 +452,14 @@ function AccessSettings({ workspaceId }: { workspaceId: string }) {
     <div className="max-w-xl space-y-5">
       <div className="rounded-2xl p-5 space-y-4" style={glassCard}>
         <div className="flex items-center gap-2 mb-1">
-          <Shield className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <Shield className="w-4 h-4" style={{ color: "#2563EB" }} />
           <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Visibilidade da central</h3>
         </div>
 
         <div className="space-y-2">
           {([
                 { id: "public", label: "Público", desc: "Qualquer pessoa pode acessar a central de ajuda." },
-                { id: "uniq_users", label: "Usuários Uniq logados", desc: "Apenas usuários logados na plataforma Uniq têm acesso." },
+                { id: "uniq_users", label: "Usuários  Qchat logados", desc: "Apenas usuários logados na plataforma  Qchat têm acesso." },
                 { id: "workspace_users", label: "Membros da workspace", desc: "Apenas membros desta workspace têm acesso." },
                 { id: "password", label: "Protegido por senha", desc: "Acesso público, mas exige uma senha para entrar." },
           ] as const).map((opt) => (
@@ -467,8 +467,8 @@ function AccessSettings({ workspaceId }: { workspaceId: string }) {
               key={opt.id}
               className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
               style={{
-                background: visibility === opt.id ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
-                border: `1px solid ${visibility === opt.id ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                background: visibility === opt.id ? "rgba(37, 99, 235,0.08)" : "var(--surface-3)",
+                border: `1px solid ${visibility === opt.id ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
               }}
             >
               <input
@@ -480,7 +480,7 @@ function AccessSettings({ workspaceId }: { workspaceId: string }) {
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm font-medium" style={{ color: visibility === opt.id ? "#00d46a" : "var(--text-1)" }}>{opt.label}</p>
+                <p className="text-sm font-medium" style={{ color: visibility === opt.id ? "#2563EB" : "var(--text-1)" }}>{opt.label}</p>
                 <p className="text-xs" style={{ color: "var(--text-3)" }}>{opt.desc}</p>
               </div>
             </label>
@@ -503,7 +503,7 @@ function AccessSettings({ workspaceId }: { workspaceId: string }) {
         <div className="flex justify-end">
           <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)", opacity: saveMutation.isPending ? 0.7 : 1 }}>
+            style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.30)", opacity: saveMutation.isPending ? 0.7 : 1 }}>
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Salvar
           </button>
@@ -535,13 +535,13 @@ function KnowledgeHero({
   return (
     <div className="relative rounded-2xl overflow-hidden p-6 sm:p-8"
       style={{
-        background: "linear-gradient(135deg, rgba(0,212,106,0.06) 0%, rgba(167,139,250,0.04) 50%, rgba(255,255,255,0.02) 100%)",
+        background: "linear-gradient(135deg, rgba(37, 99, 235,0.06) 0%, rgba(167,139,250,0.04) 50%, rgba(255,255,255,0.02) 100%)",
         border: "1px solid var(--border-default)",
         backdropFilter: "blur(24px)",
       }}>
       {/* Decorative blobs */}
       <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none"
-        style={{ background: "radial-gradient(circle, rgba(0,212,106,0.08) 0%, transparent 70%)", filter: "blur(32px)" }} />
+        style={{ background: "radial-gradient(circle, rgba(37, 99, 235,0.08) 0%, transparent 70%)", filter: "blur(32px)" }} />
       <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full pointer-events-none"
         style={{ background: "radial-gradient(circle, rgba(167,139,250,0.07) 0%, transparent 70%)", filter: "blur(24px)" }} />
 
@@ -562,7 +562,7 @@ function KnowledgeHero({
           </button>
           <button onClick={onNewArticle} disabled={creating}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.97]"
-            style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.22), rgba(0,212,106,0.10))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.32)", boxShadow: "0 4px 16px rgba(0,212,106,0.14)", opacity: creating ? 0.7 : 1 }}>
+            style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.22), rgba(37, 99, 235,0.10))", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.32)", boxShadow: "0 4px 16px rgba(37, 99, 235,0.14)", opacity: creating ? 0.7 : 1 }}>
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Novo artigo
           </button>
@@ -587,8 +587,8 @@ function KnowledgeHero({
             backdropFilter: "blur(8px)",
           }}
           onFocus={e => {
-            e.currentTarget.style.border = "1px solid rgba(0,212,106,0.30)";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,212,106,0.08)";
+            e.currentTarget.style.border = "1px solid rgba(37, 99, 235,0.30)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235,0.08)";
           }}
           onBlur={e => {
             e.currentTarget.style.border = "1px solid var(--border-default)";
@@ -612,7 +612,7 @@ function KnowledgeHero({
       <div className="relative flex items-center gap-6 mt-5 flex-wrap">
         {[
           { label: "Artigos", value: articleCount, icon: BookOpen, color: "#94a3b8" },
-          { label: "Publicados", value: publishedCount, icon: TrendingUp, color: "#00d46a" },
+          { label: "Publicados", value: publishedCount, icon: TrendingUp, color: "#2563EB" },
           { label: "Categorias", value: categoryCount, icon: FolderOpen, color: "#a78bfa" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="flex items-center gap-2">
@@ -647,7 +647,7 @@ function ArticleCard({ article, onClick }: { article: HelpDeskArticle; onClick: 
         padding: 16,
         borderRadius: 16,
         border: hovered
-          ? isPublished ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-strong)"
+          ? isPublished ? "1px solid rgba(37, 99, 235,0.20)" : "1px solid var(--border-strong)"
           : "1px solid var(--border-default)",
         boxShadow: hovered ? "0 8px 28px rgba(0,0,0,0.35)" : "0 2px 12px rgba(0,0,0,0.20)",
         transform: hovered ? "translateY(-2px)" : "none",
@@ -714,8 +714,8 @@ function CategoryPills({
         onClick={() => onSelect(null)}
         className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all duration-150"
         style={selectedId === null ? {
-          background: "rgba(0,212,106,0.12)", color: "#00d46a",
-          border: "1px solid rgba(0,212,106,0.25)", borderRadius: 10,
+          background: "rgba(37, 99, 235,0.12)", color: "#2563EB",
+          border: "1px solid rgba(37, 99, 235,0.25)", borderRadius: 10,
         } : {
           background: "var(--input)", color: "hsl(240 8% 52%)",
           border: "1px solid var(--border-default)", borderRadius: 10,
@@ -734,8 +734,8 @@ function CategoryPills({
             onClick={() => onSelect(cat.id)}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all duration-150"
             style={selectedId === cat.id ? {
-              background: "rgba(0,212,106,0.12)", color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.25)", borderRadius: 10,
+              background: "rgba(37, 99, 235,0.12)", color: "#2563EB",
+              border: "1px solid rgba(37, 99, 235,0.25)", borderRadius: 10,
             } : {
               background: "var(--input)", color: "hsl(240 8% 52%)",
               border: "1px solid var(--border-default)", borderRadius: 10,
@@ -877,9 +877,9 @@ export default function HelpDeskPage() {
                   onClick={() => setStatusFilter(s)}
                   className="px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-all"
                   style={{
-                    background: statusFilter === s ? "rgba(0,212,106,0.12)" : "var(--surface-3)",
-                    color: statusFilter === s ? "#00d46a" : "var(--text-3)",
-                    border: `1px solid ${statusFilter === s ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                    background: statusFilter === s ? "rgba(37, 99, 235,0.12)" : "var(--surface-3)",
+                    color: statusFilter === s ? "#2563EB" : "var(--text-3)",
+                    border: `1px solid ${statusFilter === s ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                   }}>
                   {STATUS_LABELS[s]}
                 </button>
@@ -911,7 +911,7 @@ export default function HelpDeskPage() {
               {!search && (
                 <button onClick={() => createArticleMutation.mutate()} disabled={createArticleMutation.isPending}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
-                  style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)" }}>
+                  style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.30)" }}>
                   <Plus className="w-4 h-4" /> Criar primeiro artigo
                 </button>
               )}
@@ -988,13 +988,13 @@ function PublicCenterLink({ workspaceId }: { workspaceId: string }) {
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
         style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}
         title="Abrir em nova aba">
-        <Globe className="w-3 h-3" style={{ color: "#00d46a" }} />
+        <Globe className="w-3 h-3" style={{ color: "#2563EB" }} />
         /{slug}
         <ExternalLink className="w-2.5 h-2.5 opacity-60" />
       </a>
       <button onClick={copy}
         className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] transition-all"
-        style={{ background: copied ? "rgba(0,212,106,0.10)" : "transparent", border: "1px solid var(--surface-border)", color: copied ? "var(--green)" : "var(--text-3)" }}
+        style={{ background: copied ? "rgba(37, 99, 235,0.10)" : "transparent", border: "1px solid var(--surface-border)", color: copied ? "var(--green)" : "var(--text-3)" }}
         title="Copiar URL completa">
         {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
         {copied ? "Copiado" : "Copiar"}

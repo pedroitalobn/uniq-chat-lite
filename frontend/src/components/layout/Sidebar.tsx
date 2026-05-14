@@ -91,7 +91,7 @@ export function Sidebar() {
   const isAdmin = isSuperAdmin;
   const isBeta = !!(session?.user?.is_beta) || isSuperAdmin;
   // Validate role — bypass enxuto pra contas restritas a WABA. Esconde
-  // tudo que não é necessário pro fluxo: Uniq AI, Agentes, CRM, Shops,
+  // tudo que não é necessário pro fluxo: QChat AI, Agentes, CRM, Shops,
   // Servers e Integrações somem do menu (também são bloqueados/filtrados
   // no backend onde aplicável). Ainda vê Inbox/Campanhas/Workspace pra
   // operar a conversa em si.
@@ -150,7 +150,7 @@ export function Sidebar() {
   const canSeeInbox = optimistic || hasPerm(PERM.inboxView);
   const canSeeCRM = optimistic || hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
   const canSeeDashboard = optimistic || hasPerm(PERM.dashboardView) || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
-  // Uniq AI e Jornadas saíram de /agents (Apr/26). Como o backend ainda não
+  // QChat AI e Jornadas saíram de /agents (Apr/26). Como o backend ainda não
   // distribuiu uniqai:use / journeys:* nos roles existentes, usamos
   // agents:view como fallback pra que quem já tinha acesso continue vendo
   // os novos itens. Owners/super-admin já bypassam por hasPerm.
@@ -163,7 +163,7 @@ export function Sidebar() {
   const canSeeIntegrations = optimistic || hasAnyPerm([PERM.integrationsView, PERM.integrationsManage]);
   const canSeeBilling = optimistic || hasAnyPerm([PERM.billingView, PERM.billingManage]);
 
-  // Ordem reflete a hierarquia mental: Uniq AI primeiro (entrada principal,
+  // Ordem reflete a hierarquia mental: QChat AI primeiro (entrada principal,
   // estilo Claude/GPT), depois Inbox/CRM/Campanhas/Jornadas (módulos onde se
   // executa o trabalho), depois Agentes (configuração de personalidade), e
   // por último a infra (Servers/Instances/Integrations) e Conta.
@@ -173,7 +173,7 @@ export function Sidebar() {
     // estavam atrás de `isBeta` antes — agora respeitam plan.allow_*.
     // Adicionar planAllows nos demais sobre-bloqueia clientes pagantes
     // cujo session.user.plan não traz a flag explicitamente.
-    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi && !isValidate },
+    { href: "/uniq-ai",      label: "QChat AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi && !isValidate },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
     { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && !isValidate },
@@ -201,7 +201,7 @@ export function Sidebar() {
     { href: "/admin/providers", label: "Providers", icon: Layers },
     { href: "/admin/branding", label: "Branding", icon: Sparkles },
     ...(features.usage ? [{ href: "/admin/usage", label: "Consumo Global", icon: Zap }] : []),
-    // Uniq AI agora vive como aba dentro de /admin/providers (?tab=ai),
+    // QChat AI agora vive como aba dentro de /admin/providers (?tab=ai),
     // sem entrada solta na sidebar.
   ];
 
@@ -232,7 +232,7 @@ export function Sidebar() {
       {/* Ambient glow — radial verde no topo, pulsa suave */}
       <div
         className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full uniq-glow-pulse"
-        style={{ background: "radial-gradient(circle, rgba(0,212,106,0.07) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, rgba(37, 99, 235,0.07) 0%, transparent 70%)" }}
       />
 
       {/* Logo + collapse toggle */}
@@ -268,7 +268,7 @@ export function Sidebar() {
               style={{
                 background: `linear-gradient(135deg, ${wsColor}30, ${wsColor}12)`,
                 border: `1px solid ${wsColor}30`,
-                boxShadow: `0 0 20px rgba(0,212,106,0.15), 0 0 0 1px var(--border-strong)`,
+                boxShadow: `0 0 20px rgba(37, 99, 235,0.15), 0 0 0 1px var(--border-strong)`,
                 transition: "box-shadow 0.3s ease",
               }}
             >
@@ -381,9 +381,9 @@ export function Sidebar() {
                 )}
                 style={active
                   ? {
-                      background: "linear-gradient(90deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.06) 100%)",
+                      background: "linear-gradient(90deg, rgba(37, 99, 235,0.18) 0%, rgba(37, 99, 235,0.06) 100%)",
                       color: "var(--text-1)",
-                      boxShadow: "inset 2px 0 0 var(--green), 0 2px 16px rgba(0,212,106,0.12), 0 0 0 1px rgba(0,212,106,0.08)",
+                      boxShadow: "inset 2px 0 0 var(--green), 0 2px 16px rgba(37, 99, 235,0.12), 0 0 0 1px rgba(37, 99, 235,0.08)",
                       backdropFilter: "blur(12px)",
                       transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                     }
@@ -404,10 +404,10 @@ export function Sidebar() {
                   className="relative flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md"
                   style={active
                     ? {
-                        background: "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))",
+                        background: "linear-gradient(135deg, rgba(37, 99, 235,0.28), rgba(37, 99, 235,0.12))",
                         backdropFilter: "blur(12px)",
-                        border: "1px solid rgba(0,212,106,0.35)",
-                        boxShadow: "0 0 16px rgba(0,212,106,0.30), inset 0 1px 0 var(--border-strong)",
+                        border: "1px solid rgba(37, 99, 235,0.35)",
+                        boxShadow: "0 0 16px rgba(37, 99, 235,0.30), inset 0 1px 0 var(--border-strong)",
                         color: "var(--green)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
@@ -431,7 +431,7 @@ export function Sidebar() {
                 {!collapsed && isInbox && unreadCount > 0 && (
                   <span
                     className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex-shrink-0"
-                    style={{ background: "var(--green)", color: "var(--text-1)", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
+                    style={{ background: "var(--green)", color: "var(--text-1)", boxShadow: "0 0 6px rgba(37, 99, 235,0.4)" }}
                   >
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
@@ -476,9 +476,9 @@ export function Sidebar() {
                     )}
                     style={active
                       ? {
-                          background: "linear-gradient(90deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.05) 100%)",
+                          background: "linear-gradient(90deg, rgba(37, 99, 235,0.15) 0%, rgba(37, 99, 235,0.05) 100%)",
                           color: "var(--text-1)",
-                          boxShadow: "inset 2px 0 0 var(--green), 0 0 20px rgba(0,212,106,0.08)",
+                          boxShadow: "inset 2px 0 0 var(--green), 0 0 20px rgba(37, 99, 235,0.08)",
                           backdropFilter: "blur(8px)",
                           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                         }
@@ -498,10 +498,10 @@ export function Sidebar() {
                       className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md"
                       style={active
                         ? {
-                            background: "linear-gradient(135deg, rgba(0,212,106,0.25), rgba(0,212,106,0.10))",
+                            background: "linear-gradient(135deg, rgba(37, 99, 235,0.25), rgba(37, 99, 235,0.10))",
                             backdropFilter: "blur(8px)",
-                            border: "1px solid rgba(0,212,106,0.30)",
-                            boxShadow: "0 0 12px rgba(0,212,106,0.20)",
+                            border: "1px solid rgba(37, 99, 235,0.30)",
+                            boxShadow: "0 0 12px rgba(37, 99, 235,0.20)",
                             color: "var(--green)",
                             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                           }
@@ -532,18 +532,18 @@ export function Sidebar() {
             onClick={closeMobile}
             className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.06) 100%)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.18) 0%, rgba(37, 99, 235,0.06) 100%)",
               backdropFilter: "blur(12px)",
-              border: "1px solid rgba(0,212,106,0.28)",
+              border: "1px solid rgba(37, 99, 235,0.28)",
               color: "var(--green)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 var(--border-default)",
+              boxShadow: "0 4px 16px rgba(37, 99, 235,0.15), inset 0 1px 0 var(--border-default)",
               transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,212,106,0.25), inset 0 1px 0 var(--border-strong)";
+              e.currentTarget.style.boxShadow = "0 4px 24px rgba(37, 99, 235,0.25), inset 0 1px 0 var(--border-strong)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 var(--border-default)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(37, 99, 235,0.15), inset 0 1px 0 var(--border-default)";
             }}
           >
             <Zap className="w-3 h-3" />
@@ -746,7 +746,7 @@ function WorkspaceDropdown({
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/5"
                   style={{
-                    background: active ? "rgba(0,212,106,0.08)" : undefined,
+                    background: active ? "rgba(37, 99, 235,0.08)" : undefined,
                   }}
                 >
                   <span

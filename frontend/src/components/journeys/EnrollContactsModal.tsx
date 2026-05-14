@@ -78,8 +78,8 @@ export function EnrollContactsModal({
           <span
             className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{
-              background: "rgba(0,212,106,0.12)",
-              border: "1px solid rgba(0,212,106,0.30)",
+              background: "rgba(37, 99, 235,0.12)",
+              border: "1px solid rgba(37, 99, 235,0.30)",
               color: "var(--green)",
             }}
           >

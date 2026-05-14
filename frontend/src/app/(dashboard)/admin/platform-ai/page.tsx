@@ -28,7 +28,7 @@ const T = {
   text2:    "rgba(255,255,255,0.55)",
   text3:    "var(--border-strong)",
   violet:   "#8b5cf6",
-  green:    "#00d46a",
+  green:    "#2563EB",
   red:      "#f87171",
   input:    "var(--border-default)",
 } as const;
@@ -56,14 +56,14 @@ type FormState = {
 };
 
 function emptyForm(): FormState {
-  return { provider: "openai", name: "Uniq AI", api_key: "", base_url: "", models: PROVIDERS[0].models, is_active: true };
+  return { provider: "openai", name: "QChat AI", api_key: "", base_url: "", models: PROVIDERS[0].models, is_active: true };
 }
 
 function fromConfig(c: PlatformAIConfig): FormState {
   return {
     id: c.id,
     provider: c.provider || "openai",
-    name: c.name || "Uniq AI",
+    name: c.name || "QChat AI",
     api_key: "",
     base_url: c.base_url || "",
     models: c.models || "",
@@ -80,9 +80,9 @@ function TestBadge({ status }: { status?: string }) {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
       padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600,
-      background: ok ? "rgba(0,212,106,0.12)" : "rgba(248,113,113,0.12)",
+      background: ok ? "rgba(37, 99, 235,0.12)" : "rgba(248,113,113,0.12)",
       color: ok ? T.green : T.red,
-      border: `1px solid ${ok ? "rgba(0,212,106,0.25)" : "rgba(248,113,113,0.25)"}`,
+      border: `1px solid ${ok ? "rgba(37, 99, 235,0.25)" : "rgba(248,113,113,0.25)"}`,
     }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: ok ? T.green : T.red, display: "inline-block" }} />
       {ok ? "Conectado" : "Falhou"}
@@ -95,9 +95,9 @@ function ActiveBadge({ active }: { active: boolean }) {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
       padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600,
-      background: active ? "rgba(0,212,106,0.08)" : "var(--input)",
+      background: active ? "rgba(37, 99, 235,0.08)" : "var(--input)",
       color: active ? T.green : T.text2,
-      border: `1px solid ${active ? "rgba(0,212,106,0.20)" : T.border}`,
+      border: `1px solid ${active ? "rgba(37, 99, 235,0.20)" : T.border}`,
     }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: active ? T.green : T.text3, display: "inline-block" }} />
       {active ? "Ativo" : "Inativo"}
@@ -242,7 +242,7 @@ function EditPanel({
             <Sparkles style={{ width: 16, height: 16, color: T.violet }} />
           </div>
           <p style={{ fontSize: 15, fontWeight: 600, color: T.text1 }}>
-            {isNew ? "Nova config Uniq AI" : `Editar: ${existingConfig?.name || "Uniq AI"}`}
+            {isNew ? "Nova config QChat AI" : `Editar: ${existingConfig?.name || "QChat AI"}`}
           </p>
           <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: T.text3, padding: 4 }}>
             <X style={{ width: 16, height: 16 }} />
@@ -255,7 +255,7 @@ function EditPanel({
             label="Nome exibido"
             value={form.name}
             onChange={(v) => onChange({ ...form, name: v })}
-            placeholder="Uniq AI"
+            placeholder="QChat AI"
           />
 
           <Select
@@ -437,7 +437,7 @@ export function PlatformAIPanel() {
           <Sparkles style={{ width: 18, height: 18, color: T.violet }} />
         </div>
         <div>
-          <h1 style={{ fontSize: 17, fontWeight: 700, color: T.text1, margin: 0 }}>Uniq AI</h1>
+          <h1 style={{ fontSize: 17, fontWeight: 700, color: T.text1, margin: 0 }}>QChat AI</h1>
           <p style={{ fontSize: 12, color: T.text2, margin: 0 }}>
             Provedores de IA globais — disponíveis para todos os usuários da plataforma
           </p>

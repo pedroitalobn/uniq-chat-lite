@@ -1,6 +1,6 @@
 "use client";
 
-// Painel principal do Uniq AI — chat moderno estilo Perplexity/GPT/Gemini.
+// Painel principal do QChat AI — chat moderno estilo Perplexity/GPT/Gemini.
 // Usa assistant-ui (useExternalStoreRuntime) para gerenciar estado e
 // renderizar mensagens com primitivos: Thread, Message, Composer, ActionBar,
 // BranchPicker, MarkdownText — tudo com tema Uniq.
@@ -21,7 +21,7 @@ import { Loader2, SendHorizonal, Square, Wand2, CheckCircle2 } from "lucide-reac
 import { toast } from "sonner";
 import { agentsApi, instancesApi, journeysApi } from "@/lib/api";
 import { MentionPicker, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { type Message } from "./atoms";
 import {
   AuiThreadMessages,
@@ -34,7 +34,7 @@ import { loadModelPref, type ModelPreference } from "./model-preference";
 import type { IslandPageContext } from "@/components/uniq-ai/island-context";
 import { cn } from "@/lib/utils";
 
-export interface UniqAIChatPanelProps {
+export interface QChatAIChatPanelProps {
   messages: Message[];
   onMessagesChange: (next: Message[] | ((prev: Message[]) => Message[])) => void;
   pageContext?: IslandPageContext | null;
@@ -60,14 +60,14 @@ function toExternalMessages(messages: Message[]): ThreadMessageLike[] {
   }));
 }
 
-export function UniqAIChatPanel({
+export function QChatAIChatPanel({
   messages,
   onMessagesChange,
   compact = false,
   hideHeader = false,
   onBeforeFirstSend,
   pageContext,
-}: UniqAIChatPanelProps) {
+}: QChatAIChatPanelProps) {
   const [modelPref, setModelPref] = useState<ModelPreference | null>(() => loadModelPref());
   const [isRunning, setIsRunning] = useState(false);
   const [phaseIdx, setPhaseIdx] = useState(0);
@@ -258,9 +258,9 @@ export function UniqAIChatPanel({
               className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{ background: "var(--green)" }}
             >
-              <UniqAIBrandMark className="w-3.5 h-3.5" stroke="white" />
+              <QChatAIBrandMark className="w-3.5 h-3.5" stroke="white" />
             </div>
-            <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Uniq AI</span>
+            <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>QChat AI</span>
             <div className="ml-auto">
               <ModelSelector value={modelPref} onChange={setModelPref} />
             </div>
@@ -300,8 +300,8 @@ export function UniqAIChatPanel({
                 transition={{ duration: 0.2 }}
                 className="flex-shrink-0 mx-3 mb-2 rounded-xl p-3"
                 style={{
-                  background: "rgba(0,212,106,0.08)",
-                  border: "1px solid rgba(0,212,106,0.2)",
+                  background: "rgba(37, 99, 235,0.08)",
+                  border: "1px solid rgba(37, 99, 235,0.2)",
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -451,7 +451,7 @@ function ComposerArea({
               exit={{ scaleX: 0 }}
               transition={{ duration: 0.3 }}
               className="absolute bottom-0 left-0 right-0 h-0.5 origin-left"
-              style={{ background: "linear-gradient(90deg, var(--green), rgba(0,212,106,0.3))" }}
+              style={{ background: "linear-gradient(90deg, var(--green), rgba(37, 99, 235,0.3))" }}
             />
           )}
         </AnimatePresence>

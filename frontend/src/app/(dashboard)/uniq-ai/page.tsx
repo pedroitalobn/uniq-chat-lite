@@ -6,9 +6,9 @@ import {
   MessageSquare, Pencil, Plus, Trash2,
   PanelLeftOpen, X,
 } from "lucide-react";
-import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
+import { QChatAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import {
   type Conversation, deriveTitle, loadConversations,
   migrateLegacyIfNeeded, newConversation, saveConversations, setActiveId,
@@ -67,7 +67,7 @@ function ConversationsDrawer({
 
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center gap-2">
-                <UniqAIBrandMark className="w-4 h-4 flex-shrink-0" stroke="var(--green)" />
+                <QChatAIBrandMark className="w-4 h-4 flex-shrink-0" stroke="var(--green)" />
                 <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Conversas</span>
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/8" style={{ color: "var(--text-3)" }}>
@@ -78,7 +78,7 @@ function ConversationsDrawer({
             <div className="px-3 py-2 flex-shrink-0">
               <button onClick={onNew}
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-                style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}>
+                style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.2)", color: "var(--green)" }}>
                 <Plus className="w-3.5 h-3.5" />
                 Nova conversa
               </button>
@@ -136,7 +136,7 @@ function ConversationsDrawer({
   );
 }
 
-export default function UniqAIPage() {
+export default function QChatAIPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -240,7 +240,7 @@ export default function UniqAIPage() {
         <motion.div
           className="absolute inset-0"
           style={{
-            background: "radial-gradient(circle at 50% 38%, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.04) 26%, transparent 62%)",
+            background: "radial-gradient(circle at 50% 38%, rgba(37, 99, 235,0.12) 0%, rgba(37, 99, 235,0.04) 26%, transparent 62%)",
           }}
           animate={{ opacity: [0.55, 0.9, 0.55], scale: [1, 1.05, 1] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
@@ -265,7 +265,7 @@ export default function UniqAIPage() {
         <motion.div
           className="absolute inset-0"
           style={{
-            backgroundImage: "linear-gradient(90deg, transparent 0%, rgba(0,212,106,0.08) 50%, transparent 100%)",
+            backgroundImage: "linear-gradient(90deg, transparent 0%, rgba(37, 99, 235,0.08) 50%, transparent 100%)",
             opacity: 0.18,
             transform: "translateX(-30%) skewX(-18deg)",
           }}
@@ -295,7 +295,7 @@ export default function UniqAIPage() {
       {/* Chat area — full height */}
       <div className="flex-1 min-h-0 flex flex-col">
         {activeConversation && (
-          <UniqAIChatPanel
+          <QChatAIChatPanel
             key={activeConversation.id}
             messages={activeConversation.messages}
             onMessagesChange={handleMessagesChange}

@@ -307,7 +307,7 @@ function ContactModal({
             </div>
           ) : (
             <div className="space-y-3 pb-1">
-              <div className="rounded-xl p-3 mb-1" style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.1)" }}>
+              <div className="rounded-xl p-3 mb-1" style={{ background: "rgba(37, 99, 235,0.04)", border: "1px solid rgba(37, 99, 235,0.1)" }}>
                 <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
                   Estas variáveis ajudam a segmentar e rastrear o lead dentro do seu processo de vendas.
                 </p>
@@ -375,7 +375,7 @@ function ContactModal({
 
 // ─── Tag Manager ──────────────────────────────────────────────────────────────
 
-const PRESET_COLORS = ["#00d46a", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+const PRESET_COLORS = ["#2563EB", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId?: string }) {
   const queryClient = useQueryClient();
@@ -557,7 +557,7 @@ function FunnelList({
       <button
         onClick={onCreate}
         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
-        style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
+        style={{ background: "var(--green, #2563EB)", color: "#0a0a0f" }}
       >
         <Plus className="w-4 h-4" />
         Criar novo funil
@@ -681,7 +681,7 @@ function FunnelForm({
         { id: "tmp-2", name: "Qualificação", color: "#fbbf24", persisted: false },
         { id: "tmp-3", name: "Proposta", color: "#a78bfa", persisted: false },
         { id: "tmp-4", name: "Negociação", color: "#fb923c", persisted: false },
-        { id: "tmp-5", name: "Fechado", color: "#00d46a", persisted: false },
+        { id: "tmp-5", name: "Fechado", color: "#2563EB", persisted: false },
       ]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -825,7 +825,7 @@ function FunnelForm({
             type="button"
             onClick={addStage}
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
-            style={{ background: "rgba(0,212,106,0.08)", color: "var(--green, #00d46a)", border: "1px solid rgba(0,212,106,0.2)" }}
+            style={{ background: "rgba(37, 99, 235,0.08)", color: "var(--green, #2563EB)", border: "1px solid rgba(37, 99, 235,0.2)" }}
           >
             <Plus className="w-3 h-3" />
             Adicionar etapa
@@ -919,7 +919,7 @@ function FunnelForm({
           onClick={() => saveMutation.mutate()}
           disabled={!canSave || saveMutation.isPending}
           className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-all disabled:opacity-40"
-          style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
+          style={{ background: "var(--green, #2563EB)", color: "#0a0a0f" }}
         >
           <Check className="w-4 h-4" />
           {editing ? "Salvar alterações" : "Criar funil"}
@@ -989,8 +989,8 @@ function FunnelSwitcher({
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03]"
               style={{
-                color: !selectedId ? "#00d46a" : "var(--text-2)",
-                background: !selectedId ? "rgba(0,212,106,0.05)" : "transparent",
+                color: !selectedId ? "#2563EB" : "var(--text-2)",
+                background: !selectedId ? "rgba(37, 99, 235,0.05)" : "transparent",
               }}
             >
               <ListIcon className="w-3.5 h-3.5" />
@@ -1008,8 +1008,8 @@ function FunnelSwitcher({
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03] text-left"
                   style={{
-                    color: f.id === selectedId ? "#00d46a" : "var(--text-1)",
-                    background: f.id === selectedId ? "rgba(0,212,106,0.05)" : "transparent",
+                    color: f.id === selectedId ? "#2563EB" : "var(--text-1)",
+                    background: f.id === selectedId ? "rgba(37, 99, 235,0.05)" : "transparent",
                   }}
                 >
                   <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: f.color || "#a78bfa" }} />
@@ -1037,7 +1037,7 @@ function FunnelSwitcher({
                 onManage();
               }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-white/[0.03]"
-              style={{ color: "var(--green, #00d46a)", borderTop: "1px solid var(--surface-border)" }}
+              style={{ color: "var(--green, #2563EB)", borderTop: "1px solid var(--surface-border)" }}
             >
               <Plus className="w-3.5 h-3.5" />
               Gerenciar funis e etapas
@@ -1109,7 +1109,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3 mb-4">
-          <div className="rounded-xl p-3" style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.1)" }}>
+          <div className="rounded-xl p-3" style={{ background: "rgba(37, 99, 235,0.04)", border: "1px solid rgba(37, 99, 235,0.1)" }}>
             <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
               Descreva o objetivo da jornada em linguagem natural — a IA gera o fluxo inicial. Você pode refinar depois em <Link href="/journeys" className="underline" style={{ color: "var(--green)" }}>/journeys</Link>.
             </p>
@@ -1362,9 +1362,9 @@ function CRMOverflowMenu({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-center p-2 rounded-xl transition-colors"
         style={{
-          background: open ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-          border: "1px solid " + (open ? "rgba(0,212,106,0.2)" : "var(--border-default)"),
-          color: open ? "#00d46a" : "var(--text-2)",
+          background: open ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+          border: "1px solid " + (open ? "rgba(37, 99, 235,0.2)" : "var(--border-default)"),
+          color: open ? "#2563EB" : "var(--text-2)",
         }}
         aria-label="Mais opções"
       >
@@ -1599,7 +1599,7 @@ export default function CRMPage() {
           {Object.entries(pipelineFilters).filter(([, v]) => v).map(([k, v]) => (
             <span key={k}
               className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg"
-              style={{ background: "rgba(0,212,106,0.08)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }}
+              style={{ background: "rgba(37, 99, 235,0.08)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.2)" }}
             >
               {k === "funnel" ? "Funil" : k === "stage" ? "Etapa" : k === "journey" ? "Jornada" : k === "owner" ? "Responsável" : "ID Externo"}: {v}
               <button onClick={() => setPipelineFilter(k, "")} className="hover:opacity-60 transition-opacity">
@@ -1648,7 +1648,7 @@ export default function CRMPage() {
               href="/crm/import"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
               style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(37, 99, 235,0.18)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
             >
               <Plus className="w-4 h-4" />
@@ -1664,13 +1664,13 @@ export default function CRMPage() {
               ? Math.floor((Date.now() - new Date(contact.updated_at).getTime()) / 86_400_000)
               : 999;
             const temp = daysSince <= 3 ? "hot" : daysSince <= 14 ? "warm" : "cold";
-            const tempColor = temp === "hot" ? "#00d46a" : temp === "warm" ? "#f59e0b" : "#475569";
+            const tempColor = temp === "hot" ? "#2563EB" : temp === "warm" ? "#f59e0b" : "#475569";
             const tempLabel = temp === "hot" ? "Ativo" : temp === "warm" ? "Morno" : "Inativo";
 
             // Avatar color based on name initial
             const charCode = (contact.name.charCodeAt(0) || 65) % 6;
             const avatarColors = [
-              ["rgba(0,212,106,0.15)", "rgba(0,212,106,0.12)", "#00d46a"],
+              ["rgba(37, 99, 235,0.15)", "rgba(37, 99, 235,0.12)", "#2563EB"],
               ["rgba(96,165,250,0.15)", "rgba(96,165,250,0.12)", "#60a5fa"],
               ["rgba(167,139,250,0.15)", "rgba(167,139,250,0.12)", "#a78bfa"],
               ["rgba(245,158,11,0.15)", "rgba(245,158,11,0.12)", "#f59e0b"],

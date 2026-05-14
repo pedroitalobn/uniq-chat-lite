@@ -48,7 +48,7 @@ const inp: CSSProperties = {
 
 const STATUS_BADGE: Record<HelpDeskArticle["status"], CSSProperties> = {
   draft: { background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" },
-  published: { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" },
+  published: { background: "rgba(37, 99, 235,0.12)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.20)" },
   archived: { background: "rgba(255,191,36,0.10)", color: "#fbbf24", border: "1px solid rgba(255,191,36,0.20)" },
 };
 
@@ -287,7 +287,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
               </span>
             )}
             {saveStatus === "saved" && (
-              <span className="text-xs flex items-center gap-1" style={{ color: "#00d46a" }}>
+              <span className="text-xs flex items-center gap-1" style={{ color: "#2563EB" }}>
                 <Check className="w-3 h-3" /> Salvo
               </span>
             )}
@@ -307,9 +307,9 @@ function ArticleEditor({ articleId }: { articleId: string }) {
               background:
                 currentStatus === "published"
                   ? "rgba(255,191,36,0.12)"
-                  : "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
-              color: currentStatus === "published" ? "#fbbf24" : "#00d46a",
-              border: `1px solid ${currentStatus === "published" ? "rgba(255,191,36,0.25)" : "rgba(0,212,106,0.30)"}`,
+                  : "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
+              color: currentStatus === "published" ? "#fbbf24" : "#2563EB",
+              border: `1px solid ${currentStatus === "published" ? "rgba(255,191,36,0.25)" : "rgba(37, 99, 235,0.30)"}`,
             }}
           >
             {publishMutation.isPending ? (
@@ -678,7 +678,7 @@ function HeroImageField({ value, onChange, wsId }: {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
             <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: "rgba(0,212,106,0.10)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" }}>
+              style={{ background: "rgba(37, 99, 235,0.10)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.20)" }}>
               {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

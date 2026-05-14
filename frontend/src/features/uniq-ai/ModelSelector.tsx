@@ -1,6 +1,6 @@
 "use client";
 
-// ModelSelector — seletor de integração + modelo do Uniq AI.
+// ModelSelector — seletor de integração + modelo do QChat AI.
 // Estilo Cursor/Claude Code: pill compacta que abre dropdown agrupado por provider.
 // Persiste em localStorage (model-preference.ts) para que Dynamic Island
 // e chat-panel compartilhem a mesma preferência.
@@ -29,7 +29,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   manus:       "#f43f5e",
   // "uniq" é o provider abstrato que o backend devolve pra non-admin
   // — não revela qual LLM/provider está por trás.
-  uniq:        "#00d46a",
+  uniq:        "#2563EB",
   default:     "#6b7280",
 };
 
@@ -45,7 +45,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen:        "Qwen",
   minimax:     "MiniMax",
   manus:       "Manus",
-  uniq:        "Uniq AI",
+  uniq:        "QChat AI",
 };
 
 function providerColor(p: string) {
@@ -110,7 +110,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
 
       const paiList: PlatformAIEntry[] = (paiRes.status === "fulfilled" ? paiRes.value.data || [] : [])
         .filter((p: any) => p.is_active && p.provider)
-        .map((p: any) => ({ id: p.id, name: p.name || "Uniq AI", provider: p.provider }));
+        .map((p: any) => ({ id: p.id, name: p.name || "QChat AI", provider: p.provider }));
       setPlatformConfigs(paiList);
 
       const filtered: Integration[] = (intRes.status === "fulfilled" ? intRes.value.data || [] : [])
@@ -130,7 +130,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       }
       setGroups(g);
 
-      // Auto-seleção: preferência salva → primeira Uniq AI ativa → primeira integração
+      // Auto-seleção: preferência salva → primeira QChat AI ativa → primeira integração
       if (!value) {
         const saved = loadModelPref();
         const savedPlatformID = saved?.integrationId?.startsWith("platform-ai-")
@@ -251,7 +251,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
             }}
           >
             <div className="py-1">
-              {/* Uniq AI configs — sempre no topo quando ativas */}
+              {/* QChat AI configs — sempre no topo quando ativas */}
               {hasPlatformAI && (
                 <div>
                   <div className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
@@ -265,7 +265,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                         key={pai.id}
                         onClick={() => { saveModelPref(pref); onChange(pref); setOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                        style={{ background: isActive ? "rgba(0,212,106,0.08)" : "transparent" }}
+                        style={{ background: isActive ? "rgba(37, 99, 235,0.08)" : "transparent" }}
                         onMouseEnter={(e) => !isActive && (e.currentTarget.style.background = "var(--surface-3)")}
                         onMouseLeave={(e) => !isActive && (e.currentTarget.style.background = "transparent")}
                       >
@@ -319,7 +319,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                                 onClick={() => select(integ, model)}
                                 className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
                                 style={{
-                                  background: isActive ? "rgba(0,212,106,0.08)" : "transparent",
+                                  background: isActive ? "rgba(37, 99, 235,0.08)" : "transparent",
                                 }}
                                 onMouseEnter={(e) =>
                                   !isActive && ((e.currentTarget.style.background = "var(--surface-3)"))
@@ -364,7 +364,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                                 key={integ.id}
                                 onClick={() => select(integ, "")}
                                 className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                                style={{ background: isActive ? "rgba(0,212,106,0.08)" : "transparent" }}
+                                style={{ background: isActive ? "rgba(37, 99, 235,0.08)" : "transparent" }}
                                 onMouseEnter={(e) =>
                                   !isActive && ((e.currentTarget.style.background = "var(--surface-3)"))
                                 }

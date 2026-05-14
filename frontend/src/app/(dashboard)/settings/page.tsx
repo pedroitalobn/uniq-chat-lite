@@ -141,7 +141,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
   });
 
   const statusColors: Record<string, { bg: string; color: string; label: string }> = {
-    active:   { bg: "rgba(0,212,106,0.08)",  color: "#00d46a", label: "Ativa" },
+    active:   { bg: "rgba(37, 99, 235,0.08)",  color: "#2563EB", label: "Ativa" },
     past_due: { bg: "rgba(251,191,36,0.08)", color: "#fbbf24", label: "Pagamento pendente" },
     canceled: { bg: "rgba(239,68,68,0.08)",  color: "#f87171", label: "Cancelada" },
     trialing: { bg: "rgba(96,165,250,0.08)", color: "#60a5fa", label: "Em teste" },
@@ -157,7 +157,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                 {isFreePlan
                   ? <Star className="w-4.5 h-4.5" style={{ color: "var(--green)" }} />
                   : <Zap className="w-4.5 h-4.5" style={{ color: "var(--green)" }} />
@@ -220,8 +220,8 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                   <div key={plan.id}
                     className="rounded-xl p-3.5 flex items-center justify-between"
                     style={{
-                      background: isCurrent ? "rgba(0,212,106,0.07)" : "var(--input)",
-                      border: isCurrent ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-default)",
+                      background: isCurrent ? "rgba(37, 99, 235,0.07)" : "var(--input)",
+                      border: isCurrent ? "1px solid rgba(37, 99, 235,0.20)" : "1px solid var(--border-default)",
                       backdropFilter: "blur(8px)",
                       transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                     }}>
@@ -242,20 +242,20 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                         disabled={checkoutMutation.isPending}
                         className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl disabled:opacity-40"
                         style={{
-                          background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+                          background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
                           backdropFilter: "blur(12px)",
-                          border: "1px solid rgba(0,212,106,0.30)",
-                          boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
+                          border: "1px solid rgba(37, 99, 235,0.30)",
+                          boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
                           color: "var(--green)",
                           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.transform = "translateY(-1px)";
-                          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 var(--border-strong)";
+                          e.currentTarget.style.boxShadow = "0 8px 24px rgba(37, 99, 235,0.28), inset 0 1px 0 var(--border-strong)";
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)";
+                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)";
                         }}
                       >
                         {checkoutMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
@@ -409,8 +409,8 @@ function ProfileSection({ session, update, t }: {
           {/* Avatar */}
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.2), rgba(0,212,106,0.05))",
-                       boxShadow: "inset 0 0 0 1px rgba(0,212,106,0.25)", color: "var(--green)" }}>
+              style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.2), rgba(37, 99, 235,0.05))",
+                       boxShadow: "inset 0 0 0 1px rgba(37, 99, 235,0.25)", color: "var(--green)" }}>
               {name?.[0]?.toUpperCase() || user?.name?.[0]?.toUpperCase() || "U"}
             </div>
             <div>
@@ -917,20 +917,20 @@ function InviteSection() {
           <button onClick={generate} disabled={generating}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
               backdropFilter: "blur(12px)",
-              border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
+              border: "1px solid rgba(37, 99, 235,0.30)",
+              boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
               color: "var(--green)",
               transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 var(--border-strong)";
+              e.currentTarget.style.boxShadow = "0 8px 24px rgba(37, 99, 235,0.28), inset 0 1px 0 var(--border-strong)";
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)";
             }}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
             Gerar código
@@ -961,7 +961,7 @@ function InviteSection() {
                   {c.used_by ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Usado</span>
                   ) : (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>Disponível</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(37, 99, 235,0.1)", color: "var(--green)" }}>Disponível</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -1020,7 +1020,7 @@ export default function SettingsPage() {
               <button key={section.id} onClick={() => setActive(section.id)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium"
                 style={{
-                  background: isActive ? "rgba(0,212,106,0.15)" : "transparent",
+                  background: isActive ? "rgba(37, 99, 235,0.15)" : "transparent",
                   color: isActive ? "var(--green)" : "var(--text-3)",
                   transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}>
@@ -1053,7 +1053,7 @@ export default function SettingsPage() {
                   )}
                   style={{
                     borderColor: "var(--border-subtle)",
-                    background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
+                    background: isActive ? "rgba(37, 99, 235,0.10)" : "transparent",
                     transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                   }}
                   onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--input)"; }}
@@ -1066,8 +1066,8 @@ export default function SettingsPage() {
                   )}
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{
-                      background: isActive ? "rgba(0,212,106,0.15)" : "var(--surface-3)",
-                      border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                      background: isActive ? "rgba(37, 99, 235,0.15)" : "var(--surface-3)",
+                      border: `1px solid ${isActive ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
                     }}>
                     <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "var(--green)" : "var(--text-3)" }} />
                   </div>

@@ -247,7 +247,7 @@ export function TemplatePicker({
             className="flex items-center gap-2 px-4 py-3"
             style={{ borderBottom: "1px solid var(--border)" }}
           >
-            <Sparkles className="h-4 w-4" style={{ color: "#00d46a" }} />
+            <Sparkles className="h-4 w-4" style={{ color: "#2563EB" }} />
             <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Templates aprovados
             </h2>
@@ -296,13 +296,13 @@ export function TemplatePicker({
                     onClick={() => setSelected(tpl)}
                     className="block w-full px-4 py-3 text-left hover:bg-white/5"
                     style={{
-                      background: active ? "rgba(0,212,106,0.06)" : "transparent",
-                      borderLeft: active ? "2px solid #00d46a" : "2px solid transparent",
+                      background: active ? "rgba(37, 99, 235,0.06)" : "transparent",
+                      borderLeft: active ? "2px solid #2563EB" : "2px solid transparent",
                     }}
                   >
                     <div
                       className="flex items-center gap-1.5 text-xs font-medium"
-                      style={{ color: active ? "#00d46a" : "var(--text-1)" }}
+                      style={{ color: active ? "#2563EB" : "var(--text-1)" }}
                     >
                       {tpl.name}
                       <span
@@ -501,7 +501,7 @@ export function TemplatePicker({
               onClick={() => send.mutate()}
               disabled={!canSend || send.isPending}
               className="rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              style={{ background: "#00d46a", color: "#03170a" }}
+              style={{ background: "#2563EB", color: "#03170a" }}
             >
               {send.isPending ? "Enviando…" : "Enviar template"}
             </button>
@@ -561,7 +561,7 @@ function MediaHeaderInputs({
           Header · {meta.label}
           {hasDefault && matchesDefault && (
             <span className="inline-flex items-center gap-0.5 normal-case font-normal text-[10px] tracking-normal"
-              style={{ color: "#00d46a" }}>
+              style={{ color: "#2563EB" }}>
               <Check className="h-2.5 w-2.5" />
               padrão
             </span>
@@ -574,9 +574,9 @@ function MediaHeaderInputs({
             disabled={saving}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium disabled:opacity-50"
             style={{
-              background: "rgba(0,212,106,0.10)",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.25)",
+              background: "rgba(37, 99, 235,0.10)",
+              color: "#2563EB",
+              border: "1px solid rgba(37, 99, 235,0.25)",
             }}
             title={hasDefault ? "Atualizar padrão pra este template" : "Salvar como padrão pra próxima vez"}
           >
@@ -609,12 +609,12 @@ function MediaHeaderInputs({
       <p className="text-[10px]" style={{ color: "hsl(240 8% 48%)" }}>
         {meta.hint}
         {hasDefault && (
-          <span className="ml-1" style={{ color: "#00d46a" }}>
+          <span className="ml-1" style={{ color: "#2563EB" }}>
             URL padrão carregada — ajuste se precisar.
           </span>
         )}
         <span className="ml-1" style={{ color: "var(--text-3)" }}>
-          Sem URL? Clique em <b>Subir arquivo</b> que a Uniq hospeda pra você.
+          Sem URL? Clique em <b>Subir arquivo</b> que a Qchat hospeda pra você.
         </span>
       </p>
       {format === "DOCUMENT" && (
@@ -654,20 +654,20 @@ function LocationHeaderInputs({
     <div
       className="mt-4 rounded-xl p-4 space-y-2"
       style={{
-        background: "rgba(0,212,106,0.04)",
-        border: "1px solid rgba(0,212,106,0.20)",
+        background: "rgba(37, 99, 235,0.04)",
+        border: "1px solid rgba(37, 99, 235,0.20)",
       }}
     >
       <div className="flex items-center justify-between gap-2">
         <h4
           className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
-          style={{ color: "#00d46a" }}
+          style={{ color: "#2563EB" }}
         >
           <MapPin className="h-3 w-3" />
           Header · Localização
           {hasDefault && matchesDefault && (
             <span className="inline-flex items-center gap-0.5 normal-case font-normal text-[10px] tracking-normal"
-              style={{ color: "#00d46a" }}>
+              style={{ color: "#2563EB" }}>
               <Check className="h-2.5 w-2.5" />
               padrão
             </span>
@@ -680,9 +680,9 @@ function LocationHeaderInputs({
             disabled={saving}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium disabled:opacity-50"
             style={{
-              background: "rgba(0,212,106,0.10)",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.25)",
+              background: "rgba(37, 99, 235,0.10)",
+              color: "#2563EB",
+              border: "1px solid rgba(37, 99, 235,0.25)",
             }}
           >
             <Save className="h-2.5 w-2.5" />
@@ -806,16 +806,16 @@ function TemplatePreview({
       {headerFormat === "LOCATION" && (
         <div
           className="mb-2 flex items-center gap-2 rounded-lg p-2"
-          style={{ background: "rgba(0,212,106,0.06)" }}
+          style={{ background: "rgba(37, 99, 235,0.06)" }}
         >
-          <MapPin className="h-5 w-5" style={{ color: "#00d46a" }} />
+          <MapPin className="h-5 w-5" style={{ color: "#2563EB" }} />
           <span className="text-[11px]" style={{ color: "hsl(240 15% 80%)" }}>
             {media.name || `${media.latitude || "?"}, ${media.longitude || "?"}`}
           </span>
         </div>
       )}
       {headerText && (
-        <div className="mb-2 text-sm font-medium" style={{ color: "#00d46a" }}>
+        <div className="mb-2 text-sm font-medium" style={{ color: "#2563EB" }}>
           {headerText}
         </div>
       )}
@@ -832,9 +832,9 @@ function TemplatePreview({
               key={i}
               className="rounded-md px-3 py-1.5 text-center text-xs font-medium"
               style={{
-                background: "rgba(0,212,106,0.08)",
-                color: "#00d46a",
-                border: "1px solid rgba(0,212,106,0.2)",
+                background: "rgba(37, 99, 235,0.08)",
+                color: "#2563EB",
+                border: "1px solid rgba(37, 99, 235,0.2)",
               }}
             >
               {b.text}

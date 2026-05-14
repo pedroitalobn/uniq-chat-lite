@@ -46,7 +46,7 @@ type Flow = {
 };
 
 const TYPE_META: Record<string, { icon: LucideIcon; color: string; label: string }> = {
-  message:        { icon: MessageSquare, color: "#00d46a", label: "WhatsApp" },
+  message:        { icon: MessageSquare, color: "#2563EB", label: "WhatsApp" },
   email:          { icon: Mail,          color: "#3b82f6", label: "Email" },
   sms:            { icon: Smartphone,    color: "#ec4899", label: "SMS" },
   buttons:        { icon: ListChecks,    color: "#60a5fa", label: "Botões" },
@@ -93,7 +93,7 @@ export function JourneyPreview({
           Jornada vazia
         </p>
         <p className="text-xs" style={{ color: "var(--text-3)" }}>
-          Diga pra Uniq AI o que você quer que aconteça e ela monta os passos pra você.
+          Diga pra QChat AI o que você quer que aconteça e ela monta os passos pra você.
         </p>
       </div>
     );
@@ -147,9 +147,9 @@ function PreviewNode({
         className="absolute left-0 top-3 w-8 h-8 rounded-full flex items-center justify-center"
         style={{
           background: `linear-gradient(135deg, ${meta.color}33, ${meta.color}10)`,
-          border: `2px solid ${highlighted ? "#00d46a" : meta.color}`,
+          border: `2px solid ${highlighted ? "#2563EB" : meta.color}`,
           boxShadow: highlighted
-            ? "0 0 14px rgba(0,212,106,0.55)"
+            ? "0 0 14px rgba(37, 99, 235,0.55)"
             : `0 0 8px ${meta.color}33`,
         }}
       >
@@ -160,9 +160,9 @@ function PreviewNode({
         className="rounded-xl px-3 py-2 transition-all"
         style={{
           background: highlighted
-            ? "linear-gradient(135deg, rgba(0,212,106,0.06), rgba(0,212,106,0.02))"
+            ? "linear-gradient(135deg, rgba(37, 99, 235,0.06), rgba(37, 99, 235,0.02))"
             : "var(--surface-1)",
-          border: `1px solid ${highlighted ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+          border: `1px solid ${highlighted ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
         }}
       >
         <div className="flex items-center gap-2 flex-wrap">
@@ -190,7 +190,7 @@ function PreviewNode({
           {highlighted && (
             <span
               className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold"
-              style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)" }}
+              style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)" }}
             >
               novo
             </span>

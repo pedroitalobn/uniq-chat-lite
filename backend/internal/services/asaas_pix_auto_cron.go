@@ -115,7 +115,7 @@ func (c *AsaasPixAutoCron) charge(ctx context.Context, user *models.User) {
 		"dueDate":                      dueDate.Format("2006-01-02"),
 		"pixAutomaticAuthorizationId":  user.AsaasSubscriptionID, // armazenamos o auth_id aqui
 		"externalReference":            user.ID.String() + "|" + plan.ID.String() + "|" + period,
-		"description":                  "Assinatura " + plan.Name + " — Uniq Chat (" + period + ")",
+		"description":                  "Assinatura " + plan.Name + " — Qchat (" + period + ")",
 	}
 	rawBody, _ := json.Marshal(body)
 

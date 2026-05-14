@@ -27,7 +27,7 @@ const ITEMS: CommandItem[] = [
   { id: "instances",    label: "Instâncias",   icon: Smartphone,      href: "/instances",    shortcut: "G N", section: "Navegação" },
   { id: "integrations", label: "Integrações",  icon: Plug,            href: "/integrations", shortcut: "G T", section: "Navegação" },
   { id: "settings",     label: "Settings",     icon: Settings,        href: "/settings",     shortcut: "G S", section: "Navegação" },
-  { id: "uniq-ai",      label: "Uniq AI",      icon: Sparkles,        href: "/uniq-ai",      shortcut: "G U", section: "Ações rápidas" },
+  { id: "uniq-ai",      label: "QChat AI",      icon: Sparkles,        href: "/uniq-ai",      shortcut: "G U", section: "Ações rápidas" },
 ];
 
 export function CommandPalette() {
@@ -177,7 +177,7 @@ export function CommandPalette() {
               width: "200px",
               height: "200px",
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(0,212,106,0.15) 0%, transparent 70%)",
+              background: "radial-gradient(circle, rgba(37, 99, 235,0.15) 0%, transparent 70%)",
               filter: "blur(40px)",
               pointerEvents: "none",
             }} />
@@ -283,7 +283,7 @@ export function CommandPalette() {
                             background: isActive ? "var(--border-default)" : "transparent",
                             backdropFilter: isActive ? "blur(4px)" : undefined,
                             borderLeft: isActive ? "2px solid var(--green)" : "2px solid transparent",
-                            boxShadow: isActive ? "inset 0 0 20px rgba(0,212,106,0.05)" : "none",
+                            boxShadow: isActive ? "inset 0 0 20px rgba(37, 99, 235,0.05)" : "none",
                             color: isActive ? "var(--text-1)" : "var(--text-2)",
                             boxSizing: "border-box",
                           }}
@@ -297,7 +297,7 @@ export function CommandPalette() {
                               height: "28px",
                               borderRadius: "8px",
                               flexShrink: 0,
-                              background: isActive ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
+                              background: isActive ? "rgba(37, 99, 235,0.12)" : "var(--border-subtle)",
                               color: isActive ? "var(--green)" : "var(--text-3)",
                               transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)",
                             }}

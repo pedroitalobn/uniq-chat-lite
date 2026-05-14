@@ -34,9 +34,9 @@ function fmtDate(s: string) {
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   draft:     { label: "Rascunho",   color: "#64748b", bg: "rgba(100,116,139,0.1)", icon: Clock },
   scheduled: { label: "Agendada",   color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  icon: Calendar },
-  running:   { label: "Executando", color: "#00d46a", bg: "rgba(0,212,106,0.1)",   icon: Loader2 },
+  running:   { label: "Executando", color: "#2563EB", bg: "rgba(37, 99, 235,0.1)",   icon: Loader2 },
   paused:    { label: "Pausada",    color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  icon: Pause },
-  completed: { label: "Concluída",  color: "#00d46a", bg: "rgba(0,212,106,0.1)",   icon: CheckCircle2 },
+  completed: { label: "Concluída",  color: "#2563EB", bg: "rgba(37, 99, 235,0.1)",   icon: CheckCircle2 },
   failed:    { label: "Cancelada",  color: "#ef4444", bg: "rgba(239,68,68,0.1)",   icon: AlertCircle },
 };
 
@@ -688,7 +688,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b" style={{ borderColor: "hsl(240 12% 12%)" }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+              style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
               <Megaphone className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
             </div>
             <div>
@@ -840,7 +840,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     onClick={() => setAudienceTab(id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={audienceTab === id
-                      ? { background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "var(--green)" }
+                      ? { background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.25)", color: "var(--green)" }
                       : { background: "var(--surface-2)", border: "1px solid var(--border)", color: "hsl(240 8% 48%)" }}>
                     <Icon className="w-3.5 h-3.5" />
                     {label}
@@ -1088,7 +1088,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   </div>
                   <div
                     className="rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-                    style={{ border: `2px dashed ${csvFile ? "var(--green)" : "hsl(240 12% 18%)"}`, background: csvFile ? "rgba(0,212,106,0.04)" : "var(--surface-2)" }}
+                    style={{ border: `2px dashed ${csvFile ? "var(--green)" : "hsl(240 12% 18%)"}`, background: csvFile ? "rgba(37, 99, 235,0.04)" : "var(--surface-2)" }}
                     onClick={() => csvRef.current?.click()}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleCsvUpload(f); }}>
@@ -1157,7 +1157,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                               onClick={() => setGroupSort(opt.id)}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                               style={active
-                                ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" }
+                                ? { background: "rgba(37, 99, 235,0.14)", color: "var(--green)" }
                                 : { background: "transparent", color: "var(--text-3)" }}>
                               {opt.label}
                             </button>
@@ -1205,11 +1205,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                             <button key={g.jid} type="button" onClick={() => toggleGroup(g)}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all"
                               style={sel
-                                ? { background: "rgba(0,212,106,0.06)", borderColor: "rgba(0,212,106,0.2)" }
+                                ? { background: "rgba(37, 99, 235,0.06)", borderColor: "rgba(37, 99, 235,0.2)" }
                                 : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                               <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
                                 style={sel
-                                  ? { background: "rgba(0,212,106,0.2)", border: "1px solid rgba(0,212,106,0.4)" }
+                                  ? { background: "rgba(37, 99, 235,0.2)", border: "1px solid rgba(37, 99, 235,0.4)" }
                                   : { background: "transparent", border: "1px solid hsl(240 12% 22%)" }}>
                                 {sel && <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                               </div>
@@ -1331,7 +1331,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         <VariableMenu onPick={(expr) => setTplHeaderURL((p) => (p + expr).trim())} />
                       </div>
                       <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-                        Sem URL? Clique em <b>Subir arquivo</b> e a Uniq hospeda. Ou cole link público direto, ou use uma variável dinâmica (ex: <code>{`{{ csv.image_url }}`}</code>).
+                        Sem URL? Clique em <b>Subir arquivo</b> e a  Qchat hospeda. Ou cole link público direto, ou use uma variável dinâmica (ex: <code>{`{{ csv.image_url }}`}</code>).
                       </p>
                     </div>
                   )}
@@ -1352,7 +1352,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           onClick={() => { setMsgType(value); setMediaFile(null); }}
                           className="flex flex-col items-center justify-center gap-1 py-2 rounded-lg border text-[10px] font-medium transition-all"
                           style={msgType === value
-                            ? { background: "rgba(0,212,106,0.10)", borderColor: "rgba(0,212,106,0.35)", color: "var(--green)" }
+                            ? { background: "rgba(37, 99, 235,0.10)", borderColor: "rgba(37, 99, 235,0.35)", color: "var(--green)" }
                             : { background: "transparent", borderColor: "var(--border-default)", color: "hsl(240 8% 55%)" }}
                           title={label}
                         >
@@ -1398,7 +1398,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </label>
                       <div
                         className="rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer"
-                        style={{ border: `2px dashed ${mediaFile ? "var(--green)" : "var(--border-default)"}`, background: mediaFile ? "rgba(0,212,106,0.04)" : "var(--surface-2)" }}
+                        style={{ border: `2px dashed ${mediaFile ? "var(--green)" : "var(--border-default)"}`, background: mediaFile ? "rgba(37, 99, 235,0.04)" : "var(--surface-2)" }}
                         onClick={() => fileRef.current?.click()}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setMediaFile(f); }}>
@@ -1805,7 +1805,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   ))}
                   <button type="button" onClick={addWindow}
                     className="w-full text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1"
-                    style={{ background: "rgba(0,212,106,0.06)", color: "var(--green)", border: "1px dashed rgba(0,212,106,0.25)" }}>
+                    style={{ background: "rgba(37, 99, 235,0.06)", color: "var(--green)", border: "1px dashed rgba(37, 99, 235,0.25)" }}>
                     <Plus className="w-3 h-3" /> Adicionar janela
                   </button>
                 </div>
@@ -1848,7 +1848,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   Aplicadas POR DESTINATÁRIO depois que a mensagem sai com
                   sucesso (idempotente — re-envio não duplica). */}
               <div className="rounded-xl p-3.5 space-y-2"
-                style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.18)" }}>
+                style={{ background: "rgba(37, 99, 235,0.04)", border: "1px solid rgba(37, 99, 235,0.18)" }}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium" style={{ color: "var(--green)" }}>
                     Ações automáticas após envio (CRM)
@@ -2046,11 +2046,11 @@ const glassPill: React.CSSProperties = {
 };
 
 const glassBtn: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+  background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
   backdropFilter: "blur(12px)",
   WebkitBackdropFilter: "blur(12px)",
-  border: "1px solid rgba(0,212,106,0.30)",
-  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
+  border: "1px solid rgba(37, 99, 235,0.30)",
+  boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
 };
 
 // ─── Variable Menu ──────────────────────────────────────────────────────────
@@ -2116,8 +2116,8 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
         title="Inserir variável"
         className="px-2 py-1.5 rounded-md text-xs font-bold transition-colors"
         style={{
-          background: open ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
-          border: `1px solid ${open ? "rgba(0,212,106,0.30)" : "var(--border-default)"}`,
+          background: open ? "rgba(37, 99, 235,0.15)" : "var(--surface-2)",
+          border: `1px solid ${open ? "rgba(37, 99, 235,0.30)" : "var(--border-default)"}`,
           color: open ? "var(--green)" : "hsl(240 8% 70%)",
         }}
       >
@@ -2219,7 +2219,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
       style={{
         ...glassCard,
         border: isRunning
-          ? "1px solid rgba(0,212,106,0.22)"
+          ? "1px solid rgba(37, 99, 235,0.22)"
           : hovered
             ? "1px solid var(--border-strong)"
             : "1px solid var(--border-default)",
@@ -2227,10 +2227,10 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         ...(hovered ? {
           transform: "translateY(-2px)",
           boxShadow: isRunning
-            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 24px rgba(0,212,106,0.10), inset 0 1px 0 var(--border-strong)"
+            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 24px rgba(37, 99, 235,0.10), inset 0 1px 0 var(--border-strong)"
             : "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-strong)",
         } : isRunning ? {
-          boxShadow: "0 4px 20px rgba(0,212,106,0.12), inset 0 1px 0 var(--border-default)",
+          boxShadow: "0 4px 20px rgba(37, 99, 235,0.12), inset 0 1px 0 var(--border-default)",
         } : {}),
       }}
       onMouseEnter={() => setHovered(true)}
@@ -2239,13 +2239,13 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
       {/* Top shimmer */}
       <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
         style={{ background: isRunning
-          ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.45), transparent)"
+          ? "linear-gradient(90deg, transparent, rgba(37, 99, 235,0.45), transparent)"
           : "linear-gradient(90deg, transparent, var(--border-strong), transparent)" }} />
       {/* Running live indicator */}
       {isRunning && (
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#00d46a" }}>ao vivo</span>
+          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#2563EB" }}>ao vivo</span>
         </div>
       )}
       <div className="p-5">
@@ -2308,7 +2308,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
             </span>
             <span className="flex items-center gap-2">
               {campaign.sent_count > 0 && (
-                <span style={{ color: "#00d46a" }}>{campaign.sent_count.toLocaleString("pt-BR")} ✓</span>
+                <span style={{ color: "#2563EB" }}>{campaign.sent_count.toLocaleString("pt-BR")} ✓</span>
               )}
               {campaign.failed_count > 0 && (
                 <span style={{ color: "#ef4444" }}>{campaign.failed_count.toLocaleString("pt-BR")} ✗</span>
@@ -2322,9 +2322,9 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
                 style={{
                   width: `${(campaign.sent_count / campaign.total_count) * 100}%`,
                   background: isRunning
-                    ? "linear-gradient(90deg, #00c45f, #00d46a)"
-                    : "linear-gradient(90deg, #00a855, #00d46a)",
-                  boxShadow: isRunning ? "0 0 8px rgba(0,212,106,0.50)" : "none",
+                    ? "linear-gradient(90deg, #00c45f, #2563EB)"
+                    : "linear-gradient(90deg, #00a855, #2563EB)",
+                  boxShadow: isRunning ? "0 0 8px rgba(37, 99, 235,0.50)" : "none",
                 }} />
             )}
             {campaign.failed_count > 0 && (
@@ -2361,7 +2361,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
           {(campaign.status === "draft" || campaign.status === "paused") && (
             <button onClick={handleStart}
               className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 rounded-xl"
-              style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)", color: "var(--green)" }}>
+              style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)", color: "var(--green)" }}>
               <Play className="w-3 h-3" /> Iniciar
             </button>
           )}
@@ -2518,7 +2518,7 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
         <button
           onClick={() => setMobileSheetOpen(true)}
           className="sm:hidden flex-shrink-0 text-xs font-medium px-3 py-2 rounded-xl inline-flex items-center gap-1.5"
-          style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+          style={{ background: "rgba(37, 99, 235,0.10)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.25)" }}
         >
           Ver templates ({CAMPAIGN_TEMPLATES.length})
         </button>

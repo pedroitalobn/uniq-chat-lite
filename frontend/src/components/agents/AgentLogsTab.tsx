@@ -96,7 +96,7 @@ export function AgentLogsTab({
       {/* Resumo */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <SummaryPill label="Total"     value={summary.total}   color="var(--text-3)" bg="var(--surface-2)" />
-        <SummaryPill label="Sucesso"   value={summary.ok}      color="var(--green)"  bg="rgba(0,212,106,0.08)" />
+        <SummaryPill label="Sucesso"   value={summary.ok}      color="var(--green)"  bg="rgba(37, 99, 235,0.08)" />
         <SummaryPill label="Pulado"    value={summary.skipped} color="#a5b4fc"       bg="rgba(99,102,241,0.08)" />
         <SummaryPill label="Falhou"    value={summary.failed}  color="#f87171"       bg="rgba(239,68,68,0.08)" />
       </div>
@@ -116,9 +116,9 @@ export function AgentLogsTab({
               onClick={() => setStatusFilter(f.id as any)}
               className="text-xs px-2.5 py-1 rounded-lg transition"
               style={{
-                background: active ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
+                background: active ? "rgba(37, 99, 235,0.1)" : "var(--surface-2)",
                 color: active ? "var(--green)" : "var(--text-2)",
-                border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                border: `1px solid ${active ? "rgba(37, 99, 235,0.25)" : "var(--surface-border)"}`,
               }}
             >
               {f.label}
@@ -233,7 +233,7 @@ function LogRow({ item, isOpen, onToggle }: { item: LogItem; isOpen: boolean; on
               <p className="text-[10px] uppercase font-semibold tracking-wider mb-1"
                 style={{ color: "var(--text-3)" }}>Resposta</p>
               <pre className="whitespace-pre-wrap rounded-lg p-2.5 text-[11px] font-mono"
-                style={{ background: "rgba(0,212,106,0.04)", color: "var(--text-1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                style={{ background: "rgba(37, 99, 235,0.04)", color: "var(--text-1)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
 {item.reply_preview}
               </pre>
             </div>

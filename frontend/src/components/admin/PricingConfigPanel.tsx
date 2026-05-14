@@ -48,13 +48,13 @@ export function PricingConfigPanel() {
     <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 rounded-xl"
-          style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.25)" }}>
+          style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.25)" }}>
           <DollarSign className="w-4 h-4" style={{ color: "var(--green)" }} />
         </div>
         <div>
           <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Pricing & Margem</h2>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-            Custo bruto que a Uniq paga + margem aplicada por categoria.
+            Custo bruto que a Qchat paga + margem aplicada por categoria.
             Valores em <strong>USD micros</strong> ($0.000001 unidade).
           </p>
         </div>
@@ -63,12 +63,12 @@ export function PricingConfigPanel() {
       {/* Margens */}
       <Section title="Margem por categoria" icon={Percent} hint="100 = user paga 2x o custo bruto. 50 = 1.5x. Mude e salve — aplica imediato em events futuros.">
         <div className="grid grid-cols-2 gap-3">
-          <NumberField label="Uniq AI (%)" value={draft.margin_pct_ai}
+          <NumberField label="QChat AI (%)" value={draft.margin_pct_ai}
             onChange={(v) => update("margin_pct_ai", v)} icon={Sparkles} color="#a78bfa" />
-          <NumberField label="Uniq Voice (%)" value={draft.margin_pct_voice}
+          <NumberField label="Qchat Voice (%)" value={draft.margin_pct_voice}
             onChange={(v) => update("margin_pct_voice", v)} icon={Mic2} color="#f59e0b" />
           <NumberField label="Mensagens (%)" value={draft.margin_pct_message}
-            onChange={(v) => update("margin_pct_message", v)} icon={MessageSquare} color="#00d46a" />
+            onChange={(v) => update("margin_pct_message", v)} icon={MessageSquare} color="#2563EB" />
           <NumberField label="Proxy (%)" value={draft.margin_pct_proxy}
             onChange={(v) => update("margin_pct_proxy", v)} icon={Globe} color="#60a5fa" />
         </div>
@@ -81,7 +81,7 @@ export function PricingConfigPanel() {
       </Section>
 
       {/* LLM */}
-      <Section title="LLM (Uniq AI) — custo bruto" icon={Sparkles} hint="Defaults usados quando o modelo não está na matrix. USD micros por 1k tokens.">
+      <Section title="LLM (QChat AI) — custo bruto" icon={Sparkles} hint="Defaults usados quando o modelo não está na matrix. USD micros por 1k tokens.">
         <div className="grid grid-cols-2 gap-3">
           <NumberField label="Input default ($/1k)"
             value={draft.llm_default_input_cost_per_1k}

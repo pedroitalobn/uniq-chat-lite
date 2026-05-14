@@ -200,14 +200,14 @@ function FilterDropdown({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
         style={{
-          background: active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
-          border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
-          color: active ? "#00d46a" : "var(--text-1)",
-          boxShadow: active ? "0 0 12px rgba(0,212,106,0.10)" : "none",
+          background: active ? "rgba(37, 99, 235,0.12)" : "var(--border-subtle)",
+          border: `1px solid ${active ? "rgba(37, 99, 235,0.25)" : "var(--border-default)"}`,
+          color: active ? "#2563EB" : "var(--text-1)",
+          boxShadow: active ? "0 0 12px rgba(37, 99, 235,0.10)" : "none",
           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
         }}
       >
-        <span style={{ color: active ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
+        <span style={{ color: active ? "#2563EB" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
         <span className="truncate max-w-[140px]">{label}</span>
         <ChevronDown className="h-3 w-3" />
       </button>
@@ -229,8 +229,8 @@ function FilterDropdown({
                 onClick={() => { onSelect(opt.id); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5"
                 style={{
-                  color: isSelected ? "#00d46a" : "var(--text-1)",
-                  background: isSelected ? "rgba(0,212,106,0.08)" : "transparent",
+                  color: isSelected ? "#2563EB" : "var(--text-1)",
+                  background: isSelected ? "rgba(37, 99, 235,0.08)" : "transparent",
                 }}
               >
                 {opt.color && (

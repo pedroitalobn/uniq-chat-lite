@@ -143,7 +143,7 @@ export function BillingLinkModal({ user, onClose }: { user: User; onClose: () =>
 
         {result && result.action === "subscription_updated" && (
           <div className="space-y-3">
-            <div className="rounded-xl p-4" style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.25)" }}>
+            <div className="rounded-xl p-4" style={{ background: "rgba(37, 99, 235,0.06)", border: "1px solid rgba(37, 99, 235,0.25)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <Check className="w-4 h-4" style={{ color: "var(--green)" }} />
                 <p className="text-sm font-medium" style={{ color: "var(--green)" }}>Plano trocado in-place</p>

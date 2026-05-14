@@ -1747,7 +1747,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 					Value:             plan.Price,
 					Cycle:             "MONTHLY",
 					NextDueDate:       time.Now().Format("2006-01-02"),
-					Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+					Description:       "Assinatura " + plan.Name + " — Qchat",
 					ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
 					CreditCard: &AsaasCreditCard{
 						HolderName:  req.AsaasCard.HolderName,

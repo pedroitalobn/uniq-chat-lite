@@ -29,7 +29,7 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ComponentType<{ classN
   { id: "fields",  label: "Campos personalizados", icon: Layers, description: "Crie atributos próprios pra deals, contatos e empresas (em breve)" },
 ];
 
-const PRESET_COLORS = ["#00d46a", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+const PRESET_COLORS = ["#2563EB", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 export default function PropertiesPage() {
   const { currentWorkspace } = useWorkspace();
@@ -54,9 +54,9 @@ export default function PropertiesPage() {
                   className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all flex-shrink-0"
                   style={{
                     background: active
-                      ? "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.06))"
+                      ? "linear-gradient(135deg, rgba(37, 99, 235,0.18), rgba(37, 99, 235,0.06))"
                       : "var(--input)",
-                    border: active ? "1px solid rgba(0,212,106,0.25)" : "1px solid var(--border-default)",
+                    border: active ? "1px solid rgba(37, 99, 235,0.25)" : "1px solid var(--border-default)",
                     color: active ? "var(--green)" : "var(--text-2)",
                   }}
                 >

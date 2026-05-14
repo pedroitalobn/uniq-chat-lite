@@ -80,7 +80,7 @@ export const ACTION_CATEGORIES: ActionCategory[] = [
     id: "crm",
     label: "CRM & Atendimento",
     emoji: "🤝",
-    color: "#00d46a",
+    color: "#2563EB",
     actions: [
       { id: "add_tag",            label: "Adicionar tag",       description: "Marca o contato com uma tag (VIP, comprador, lead-quente).", icon: Tag },
       { id: "remove_tag",         label: "Remover tag",         description: "Tira uma tag do contato.",                                  icon: BookmarkPlus },

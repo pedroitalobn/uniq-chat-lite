@@ -236,8 +236,8 @@ export function SkillsModal({ form, update, onClose }: Props) {
                   onClick={() => update((p) => ({ ...p, action_confirmation: opt.value }))}
                   className="flex flex-col gap-1 px-3 py-2 rounded-lg text-left transition-all"
                   style={{
-                    background: active ? "rgba(0,212,106,0.10)" : "var(--surface-1)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                    background: active ? "rgba(37, 99, 235,0.10)" : "var(--surface-1)",
+                    border: `1px solid ${active ? "rgba(37, 99, 235,0.30)" : "var(--surface-border)"}`,
                   }}
                 >
                   <span

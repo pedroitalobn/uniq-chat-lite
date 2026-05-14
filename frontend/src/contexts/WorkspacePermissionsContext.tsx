@@ -164,7 +164,7 @@ export const PERM = {
   serversManage: "servers:manage",
   agentsView: "agents:view",
   agentsManage: "agents:manage",
-  // Uniq AI — chat interativo central que cria/lista/edita recursos via NL.
+  // QChat AI — chat interativo central que cria/lista/edita recursos via NL.
   uniqAiUse: "uniqai:use",
   // Jornadas — módulo top-level (saiu de dentro de /agents em Apr/26).
   // No backend ainda compartilha o flag agents:* — gateamos a UI já com

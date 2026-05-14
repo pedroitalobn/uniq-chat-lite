@@ -29,9 +29,9 @@ export function InboxSettingsHeader({
           width: "fit-content",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,212,106,0.08)";
-          e.currentTarget.style.borderColor = "rgba(0,212,106,0.22)";
-          e.currentTarget.style.color = "#00d46a";
+          e.currentTarget.style.background = "rgba(37, 99, 235,0.08)";
+          e.currentTarget.style.borderColor = "rgba(37, 99, 235,0.22)";
+          e.currentTarget.style.color = "#2563EB";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "var(--input)";

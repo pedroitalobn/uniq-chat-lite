@@ -133,7 +133,7 @@ export function PullToRefresh({
             height: 36,
             background: "rgba(10,10,20,0.85)",
             backdropFilter: "blur(12px)",
-            border: "1px solid rgba(0,212,106,0.30)",
+            border: "1px solid rgba(37, 99, 235,0.30)",
             boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
           }}
         >

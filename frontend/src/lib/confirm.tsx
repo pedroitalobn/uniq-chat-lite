@@ -57,8 +57,8 @@ function ConfirmDialog({
           <div style={{
             width: "38px", height: "38px", borderRadius: "10px", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: danger ? "rgba(239,68,68,0.10)" : "rgba(0,212,106,0.10)",
-            border: danger ? "1px solid rgba(239,68,68,0.22)" : "1px solid rgba(0,212,106,0.22)",
+            background: danger ? "rgba(239,68,68,0.10)" : "rgba(37, 99, 235,0.10)",
+            border: danger ? "1px solid rgba(239,68,68,0.22)" : "1px solid rgba(37, 99, 235,0.22)",
           }}>
             {danger
               ? <AlertTriangle style={{ width: "17px", height: "17px", color: "#f87171" }} />

@@ -333,9 +333,9 @@ function ViewToggle({ active, onClick, label, icon }: {
       onClick={onClick}
       className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium"
       style={{
-        background: active ? "rgba(0,212,106,0.12)" : "transparent",
-        border: active ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
-        boxShadow: active ? "0 0 10px rgba(0,212,106,0.10)" : "none",
+        background: active ? "rgba(37, 99, 235,0.12)" : "transparent",
+        border: active ? "1px solid rgba(37, 99, 235,0.20)" : "1px solid transparent",
+        boxShadow: active ? "0 0 10px rgba(37, 99, 235,0.10)" : "none",
         color: active ? uniq.green : uniq.textDim,
         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
       }}
@@ -427,7 +427,7 @@ function FunnelSelector({ funnels, activeId, onChange }: {
                 className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-white/5"
                 style={{
                   color: f.id === activeId ? uniq.green : uniq.textPrimary,
-                  background: f.id === activeId ? "rgba(0,212,106,0.08)" : "transparent",
+                  background: f.id === activeId ? "rgba(37, 99, 235,0.08)" : "transparent",
                   transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
               >

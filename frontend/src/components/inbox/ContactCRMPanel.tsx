@@ -155,7 +155,7 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
             type="button"
             onClick={() => setShowTagPicker((v) => !v)}
             className="text-[9px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-            style={{ color: "var(--green)", background: "rgba(0,212,106,0.08)" }}
+            style={{ color: "var(--green)", background: "rgba(37, 99, 235,0.08)" }}
           >
             {showTagPicker ? <><X className="w-2.5 h-2.5" /> Fechar</> : <><Plus className="w-2.5 h-2.5" /> Editar</>}
           </button>
@@ -217,7 +217,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function dealStatusColor(s: string) {
-  if (s === "won") return "#00d46a";
+  if (s === "won") return "#2563EB";
   if (s === "lost") return "#ef4444";
   return "#3b82f6";
 }

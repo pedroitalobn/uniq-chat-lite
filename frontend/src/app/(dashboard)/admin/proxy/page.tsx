@@ -260,8 +260,8 @@ function ProxyModal({
         {testResult && (
           <div className="p-3 rounded-xl text-xs"
             style={{
-              background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
-              border: `1px solid ${testResult.success ? "rgba(0,212,106,0.2)" : "rgba(239,68,68,0.2)"}`,
+              background: testResult.success ? "rgba(37, 99, 235,0.08)" : "rgba(239,68,68,0.08)",
+              border: `1px solid ${testResult.success ? "rgba(37, 99, 235,0.2)" : "rgba(239,68,68,0.2)"}`,
               color: testResult.success ? "var(--green)" : "#f87171",
             }}>
             {testResult.success ? (
@@ -591,7 +591,7 @@ export default function AdminProxyPage() {
                   {/* Status indicator dot */}
                   <div className="relative flex-shrink-0">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ background: proxy.enabled ? "rgba(0,212,106,0.1)" : "var(--surface-2)" }}>
+                      style={{ background: proxy.enabled ? "rgba(37, 99, 235,0.1)" : "var(--surface-2)" }}>
                       <Globe className="w-5 h-5" style={{ color: proxy.enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
                     </div>
                     {/* Live status dot */}

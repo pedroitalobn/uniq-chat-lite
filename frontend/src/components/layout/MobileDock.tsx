@@ -4,7 +4,7 @@
 // app nativo. 5 slots:
 //   1. Início (link)
 //   2. Inbox (link, badge unread)
-//   3. ✨ Uniq AI — botão DESTACADO no centro (raised, gradient verde,
+//   3. ✨ QChat AI — botão DESTACADO no centro (raised, gradient verde,
 //       acima da linha do dock). Substitui a FAB flutuante /right-4 que
 //       sobrepunha o menu antes.
 //   4. CRM (link)
@@ -23,8 +23,8 @@ import {
   Megaphone, Wand2, Bot, Smartphone, Plug, Settings, Building2,
   LifeBuoy, ShoppingBag, X, Database, Server, Zap, LogOut,
 } from "lucide-react";
-import { useUniqAIIsland } from "@/components/uniq-ai/island-context";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { useQChatAIIsland } from "@/components/uniq-ai/island-context";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { haptic } from "@/lib/haptics";
 import { features } from "@/lib/feature-flags";
 
@@ -65,7 +65,7 @@ const MORE: NavEntry[] = [
 export function MobileDock() {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const island = useUniqAIIsland();
+  const island = useQChatAIIsland();
 
   const isActive = (href: string) =>
     pathname === href || (pathname?.startsWith(href + "/") ?? false);
@@ -126,7 +126,7 @@ export function MobileDock() {
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
             border: "1px solid var(--border-default)",
             borderRadius: 28,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.50), 0 -2px 12px rgba(0,212,106,0.08), inset 0 1px 0 var(--border-default)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.50), 0 -2px 12px rgba(37, 99, 235,0.08), inset 0 1px 0 var(--border-default)",
           }}
         >
           <div
@@ -137,8 +137,8 @@ export function MobileDock() {
             className="pointer-events-none absolute bottom-1.5 h-10 w-[58px] -translate-x-1/2 rounded-[18px]"
             style={{
               left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
-              background: "linear-gradient(180deg, rgba(0,212,106,0.16) 0%, rgba(0,212,106,0.05) 72%, transparent 100%)",
-              boxShadow: "0 0 24px rgba(0,212,106,0.16)",
+              background: "linear-gradient(180deg, rgba(37, 99, 235,0.16) 0%, rgba(37, 99, 235,0.05) 72%, transparent 100%)",
+              boxShadow: "0 0 24px rgba(37, 99, 235,0.16)",
             }}
             animate={{
               left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
@@ -150,8 +150,8 @@ export function MobileDock() {
             className="pointer-events-none absolute bottom-[7px] h-[3px] w-11 -translate-x-1/2 rounded-full"
             style={{
               left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
-              background: "linear-gradient(90deg, rgba(0,212,106,0.12), rgba(110,255,178,0.98), rgba(0,212,106,0.12))",
-              boxShadow: "0 0 12px rgba(0,212,106,0.55), 0 0 26px rgba(0,212,106,0.22)",
+              background: "linear-gradient(90deg, rgba(37, 99, 235,0.12), rgba(110,255,178,0.98), rgba(37, 99, 235,0.12))",
+              boxShadow: "0 0 12px rgba(37, 99, 235,0.55), 0 0 26px rgba(37, 99, 235,0.22)",
             }}
             animate={{
               left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
@@ -165,8 +165,8 @@ export function MobileDock() {
             <DockItem key={item.href} item={item} active={isActive(item.href)} index={i} />
           ))}
 
-          {/* Uniq AI — botão centro, raised */}
-          <UniqAICenterButton open={() => island.open()} />
+          {/* QChat AI — botão centro, raised */}
+          <QChatAICenterButton open={() => island.open()} />
 
           {PRIMARY_RIGHT.map((item, i) => (
             <DockItem key={item.href} item={item} active={isActive(item.href)} index={i + 3} />
@@ -188,14 +188,14 @@ export function MobileDock() {
               style={{
                 width: 32,
                 height: 32,
-                background: isMoreActive ? "radial-gradient(circle, rgba(0,212,106,0.24) 0%, rgba(0,212,106,0.08) 72%, transparent 100%)" : "transparent",
-                boxShadow: isMoreActive ? "0 0 18px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
+                background: isMoreActive ? "radial-gradient(circle, rgba(37, 99, 235,0.24) 0%, rgba(37, 99, 235,0.08) 72%, transparent 100%)" : "transparent",
+                boxShadow: isMoreActive ? "0 0 18px rgba(37, 99, 235,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
               }}
             >
               {isMoreActive && (
                 <motion.span
                   className="absolute inset-0 rounded-xl"
-                  style={{ border: "1px solid rgba(0,212,106,0.28)" }}
+                  style={{ border: "1px solid rgba(37, 99, 235,0.28)" }}
                   animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
                   transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
                 />
@@ -207,8 +207,8 @@ export function MobileDock() {
               <motion.span
                 className="mt-1 h-[2px] rounded-full"
                 style={{
-                  background: "linear-gradient(90deg, rgba(0,212,106,0.2), rgba(0,212,106,0.95), rgba(0,212,106,0.2))",
-                  boxShadow: "0 0 8px rgba(0,212,106,0.4)",
+                  background: "linear-gradient(90deg, rgba(37, 99, 235,0.2), rgba(37, 99, 235,0.95), rgba(37, 99, 235,0.2))",
+                  boxShadow: "0 0 8px rgba(37, 99, 235,0.4)",
                 }}
                 animate={{
                   width: isMoreActive ? "100%" : "0%",
@@ -274,10 +274,10 @@ export function MobileDock() {
                   const active = item.href ? isActive(item.href) : false;
                   const cardStyle = active
                     ? {
-                        background: "rgba(0,212,106,0.14)",
-                        border: "1px solid rgba(0,212,106,0.30)",
+                        background: "rgba(37, 99, 235,0.14)",
+                        border: "1px solid rgba(37, 99, 235,0.30)",
                         color: "var(--green)",
-                        boxShadow: "0 0 18px rgba(0,212,106,0.18)",
+                        boxShadow: "0 0 18px rgba(37, 99, 235,0.18)",
                       }
                     : item.action
                       ? {
@@ -356,14 +356,14 @@ function DockItem({ item, active, index }: { item: NavEntry; active: boolean; in
           style={{
             width: 32,
             height: 32,
-            background: active ? "radial-gradient(circle, rgba(0,212,106,0.24) 0%, rgba(0,212,106,0.08) 72%, transparent 100%)" : "transparent",
-            boxShadow: active ? "0 0 18px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
+            background: active ? "radial-gradient(circle, rgba(37, 99, 235,0.24) 0%, rgba(37, 99, 235,0.08) 72%, transparent 100%)" : "transparent",
+            boxShadow: active ? "0 0 18px rgba(37, 99, 235,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
           }}
         >
           {active && (
             <motion.span
               className="absolute inset-0 rounded-xl"
-              style={{ border: "1px solid rgba(0,212,106,0.28)" }}
+              style={{ border: "1px solid rgba(37, 99, 235,0.28)" }}
               animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -375,8 +375,8 @@ function DockItem({ item, active, index }: { item: NavEntry; active: boolean; in
           <motion.span
             className="mt-1 h-[2px] rounded-full"
             style={{
-              background: "linear-gradient(90deg, rgba(0,212,106,0.2), rgba(0,212,106,0.95), rgba(0,212,106,0.2))",
-              boxShadow: "0 0 8px rgba(0,212,106,0.4)",
+              background: "linear-gradient(90deg, rgba(37, 99, 235,0.2), rgba(37, 99, 235,0.95), rgba(37, 99, 235,0.2))",
+              boxShadow: "0 0 8px rgba(37, 99, 235,0.4)",
             }}
             animate={{
               width: active ? "100%" : "0%",
@@ -390,7 +390,7 @@ function DockItem({ item, active, index }: { item: NavEntry; active: boolean; in
   );
 }
 
-function UniqAICenterButton({ open }: { open: () => void }) {
+function QChatAICenterButton({ open }: { open: () => void }) {
   const pathname = usePathname();
   const isActive = pathname?.startsWith("/uniq-ai") ?? false;
 
@@ -407,12 +407,12 @@ function UniqAICenterButton({ open }: { open: () => void }) {
           width: 56,
           height: 56,
           top: -16, // raised acima da linha do dock
-          background: "linear-gradient(135deg, #00d46a 0%, #00b259 100%)",
+          background: "linear-gradient(135deg, #2563EB 0%, #00b259 100%)",
           boxShadow: isActive
-            ? "0 10px 28px rgba(0,212,106,0.52), 0 0 0 4px rgba(10,10,20,0.78), 0 0 0 1px rgba(167,255,205,0.85), inset 0 1px 0 rgba(255,255,255,0.32)"
-            : "0 8px 24px rgba(0,212,106,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 var(--border-strong)",
+            ? "0 10px 28px rgba(37, 99, 235,0.52), 0 0 0 4px rgba(10,10,20,0.78), 0 0 0 1px rgba(167,255,205,0.85), inset 0 1px 0 rgba(255,255,255,0.32)"
+            : "0 8px 24px rgba(37, 99, 235,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 var(--border-strong)",
         }}
-        aria-label="Abrir Uniq AI"
+        aria-label="Abrir QChat AI"
       >
         {isActive && (
           <motion.span
@@ -422,7 +422,7 @@ function UniqAICenterButton({ open }: { open: () => void }) {
             transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
           />
         )}
-        <UniqAIBrandMark className="w-6 h-6" stroke="#0a0a14" />
+        <QChatAIBrandMark className="w-6 h-6" stroke="#0a0a14" />
       </motion.button>
     </div>
   );

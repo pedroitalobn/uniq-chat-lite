@@ -122,7 +122,7 @@ export default function InviteAcceptPage({
       {/* Ambient glow */}
       <div
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at bottom, rgba(0,212,106,0.06) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse at bottom, rgba(37, 99, 235,0.06) 0%, transparent 70%)" }}
       />
       <div className="w-full max-w-md relative animate-fade-in-up">
         <div className="flex flex-col items-center mb-6">
@@ -145,7 +145,7 @@ export default function InviteAcceptPage({
   if (loadingPreview) {
     return renderShell(
       <div className="flex flex-col items-center text-center space-y-3 py-4">
-        <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00d46a" }} />
+        <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#2563EB" }} />
         <p className="text-sm" style={{ color: "var(--text-3)" }}>Carregando convite…</p>
       </div>,
     );
@@ -186,10 +186,10 @@ export default function InviteAcceptPage({
   const inviteBanner = (
     <div
       className="rounded-xl p-4 space-y-2.5"
-      style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.15)" }}
+      style={{ background: "rgba(37, 99, 235,0.04)", border: "1px solid rgba(37, 99, 235,0.15)" }}
     >
       <div className="flex items-center gap-2">
-        <Building2 className="h-4 w-4" style={{ color: "#00d46a" }} />
+        <Building2 className="h-4 w-4" style={{ color: "#2563EB" }} />
         <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
           {preview.workspace_name}
         </span>
@@ -218,12 +218,12 @@ export default function InviteAcceptPage({
           <div
             className="h-12 w-12 rounded-2xl flex items-center justify-center"
             style={{
-              background: isRegister ? "rgba(0,212,106,0.1)" : "rgba(99,102,241,0.1)",
-              border: `1px solid ${isRegister ? "rgba(0,212,106,0.25)" : "rgba(99,102,241,0.25)"}`,
+              background: isRegister ? "rgba(37, 99, 235,0.1)" : "rgba(99,102,241,0.1)",
+              border: `1px solid ${isRegister ? "rgba(37, 99, 235,0.25)" : "rgba(99,102,241,0.25)"}`,
             }}
           >
             {isRegister ? (
-              <UserPlus className="h-5 w-5" style={{ color: "#00d46a" }} />
+              <UserPlus className="h-5 w-5" style={{ color: "#2563EB" }} />
             ) : (
               <LogIn className="h-5 w-5" style={{ color: "#a5b4fc" }} />
             )}
@@ -242,7 +242,7 @@ export default function InviteAcceptPage({
       <>
         {inviteBanner}
         <div className="flex flex-col items-center text-center space-y-3 pt-2">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00d46a" }} />
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#2563EB" }} />
           <p className="text-sm" style={{ color: "var(--text-3)" }}>Processando convite…</p>
         </div>
       </>,
@@ -257,9 +257,9 @@ export default function InviteAcceptPage({
         <div className="flex flex-col items-center text-center space-y-3 pt-2">
           <div
             className="h-14 w-14 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.3)" }}
+            style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.3)" }}
           >
-            <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
+            <Check className="h-7 w-7" style={{ color: "#2563EB" }} />
           </div>
           <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
             Você faz parte de {preview.workspace_name}
@@ -270,7 +270,7 @@ export default function InviteAcceptPage({
           <button
             onClick={go}
             className="flex items-center gap-2 text-sm font-medium px-5 py-2.5 mt-2 rounded-xl transition-colors"
-            style={{ background: "#00d46a", color: "#0a0a0f" }}
+            style={{ background: "#2563EB", color: "#0a0a0f" }}
           >
             Entrar no workspace
           </button>

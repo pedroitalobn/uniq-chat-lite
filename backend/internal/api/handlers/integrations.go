@@ -60,7 +60,7 @@ func (h *IntegrationHandler) ClaudeOAuthClientMetadata(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/json")
 	return c.JSON(fiber.Map{
 		"client_id":                  clientID,
-		"client_name":                "Uniq Chat",
+		"client_name":                "Qchat",
 		"client_uri":                 "https://uniq.chat",
 		"redirect_uris":              []string{redirectURI},
 		"grant_types":                []string{"authorization_code", "refresh_token"},

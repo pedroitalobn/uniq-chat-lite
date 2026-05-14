@@ -49,8 +49,8 @@ function InputField({
           className={inputCls}
           style={{
             paddingLeft: icon ? "2.5rem" : undefined,
-            borderColor: focused ? "#00d46a" : "var(--border-default)",
-            boxShadow: focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+            borderColor: focused ? "#2563EB" : "var(--border-default)",
+            boxShadow: focused ? "0 0 0 3px rgba(37, 99, 235,0.10)" : "none",
           }}
         />
       </div>
@@ -113,9 +113,9 @@ function StepEmail({
             <span
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
               style={{
-                background: isPaid ? "rgba(0,212,106,0.10)" : "rgba(99,91,255,0.10)",
-                border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
-                color: isPaid ? "#00d46a" : "#a5a3ff",
+                background: isPaid ? "rgba(37, 99, 235,0.10)" : "rgba(99,91,255,0.10)",
+                border: `1px solid ${isPaid ? "rgba(37, 99, 235,0.25)" : "rgba(99,91,255,0.25)"}`,
+                color: isPaid ? "#2563EB" : "#a5a3ff",
               }}
             >
               <Sparkles className="w-3 h-3" />
@@ -150,7 +150,7 @@ function StepEmail({
             {error}
             {isConflict && (
               <>{" "}<Link href={`/login?email=${encodeURIComponent(email)}`}
-                className="underline underline-offset-2 font-medium" style={{ color: "#00d46a" }}>
+                className="underline underline-offset-2 font-medium" style={{ color: "#2563EB" }}>
                 Fazer login →
               </Link></>
             )}
@@ -162,9 +162,9 @@ function StepEmail({
         type="submit"
         disabled={loading}
         className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60"
-        style={{ background: "#00d46a", color: "#050508" }}
+        style={{ background: "#2563EB", color: "#050508" }}
         onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
-        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
+        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#2563EB"}
       >
         {loading
           ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -173,7 +173,7 @@ function StepEmail({
 
       <p className="text-center text-xs text-[hsl(240_8%_38%)]">
         Já tem conta?{" "}
-        <Link href="/login" className="font-medium hover:opacity-80 transition-opacity" style={{ color: "#00d46a" }}>
+        <Link href="/login" className="font-medium hover:opacity-80 transition-opacity" style={{ color: "#2563EB" }}>
           Fazer login
         </Link>
       </p>
@@ -238,7 +238,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
       >
         <div
           className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl select-none"
-          style={{ background: "rgba(0,212,106,0.07)", border: "1px solid rgba(0,212,106,0.18)" }}
+          style={{ background: "rgba(37, 99, 235,0.07)", border: "1px solid rgba(37, 99, 235,0.18)" }}
         >
           ✉️
         </div>
@@ -247,7 +247,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
           animate={{ scale: 1 }}
           transition={{ delay: 0.35, type: "spring", stiffness: 400 }}
           className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: "#00d46a" }}
+          style={{ background: "#2563EB" }}
         >
           <CheckCircle2 className="w-4 h-4" style={{ color: "#050508" }} />
         </motion.div>
@@ -297,7 +297,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-xs font-medium"
-            style={{ color: "#00d46a" }}
+            style={{ color: "#2563EB" }}
           >
             Novo link enviado!
           </motion.p>
@@ -307,7 +307,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
           onClick={resend}
           disabled={cooldown > 0 || resending}
           className="flex items-center gap-1.5 text-xs disabled:opacity-50 transition-all"
-          style={{ color: cooldown > 0 ? "hsl(240 8% 38%)" : "#00d46a" }}
+          style={{ color: cooldown > 0 ? "hsl(240 8% 38%)" : "#2563EB" }}
         >
           {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
           {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Reenviar link"}
@@ -364,9 +364,9 @@ function RegisterContent() {
                   width: i === step ? 24 : 7,
                   height: 7,
                   background: i < step
-                    ? "#00d46a"
+                    ? "#2563EB"
                     : i === step
-                      ? "#00d46a"
+                      ? "#2563EB"
                       : "var(--border-default)",
                   opacity: i > step ? 0.5 : 1,
                 }}
@@ -374,7 +374,7 @@ function RegisterContent() {
               {i < 2 && (
                 <div
                   className="h-px w-6 transition-all duration-500"
-                  style={{ background: i < step ? "#00d46a" : "var(--border-default)" }}
+                  style={{ background: i < step ? "#2563EB" : "var(--border-default)" }}
                 />
               )}
             </div>

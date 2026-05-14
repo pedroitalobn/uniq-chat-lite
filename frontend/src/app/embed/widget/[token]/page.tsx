@@ -270,7 +270,7 @@ export default function EmbedWidgetPage() {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const color = config?.primary_color ?? "#00d46a";
+  const color = config?.primary_color ?? "#2563EB";
   const name = config?.display_name ?? "Suporte";
   const showArticlesTab = config?.help_desk_enabled === true;
 

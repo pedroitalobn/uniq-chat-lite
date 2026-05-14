@@ -986,7 +986,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
                 border:       "1px solid var(--border-default)",
                 color:        "var(--text-1)",
               }}
-              onFocus={e => ((e.target as HTMLInputElement).style.borderColor = "rgba(0,212,106,0.45)")}
+              onFocus={e => ((e.target as HTMLInputElement).style.borderColor = "rgba(37, 99, 235,0.45)")}
               onBlur={e  => ((e.target as HTMLInputElement).style.borderColor = "var(--border-default)")}
             />
           </div>
@@ -997,7 +997,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
               const isActive = activeCategory === tab.value;
               const color =
                 tab.value === "all"
-                  ? "#00d46a"
+                  ? "#2563EB"
                   : CATEGORY_CONFIG[tab.value as Exclude<Category, "all">].color;
               return (
                 <button

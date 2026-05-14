@@ -107,7 +107,7 @@ function SuccessContent() {
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px]"
-          style={{ background: "radial-gradient(ellipse, rgba(0,212,106,0.06) 0%, transparent 65%)" }} />
+          style={{ background: "radial-gradient(ellipse, rgba(37, 99, 235,0.06) 0%, transparent 65%)" }} />
       </div>
 
       <div className="relative w-full max-w-md text-center animate-fade-in-up">
@@ -116,8 +116,8 @@ function SuccessContent() {
         {/* Success icon */}
         <div className="relative inline-flex mb-5">
           <div className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.28)" }}>
-            <CheckCircle className="w-7 h-7" style={{ color: "#00d46a" }} />
+            style={{ background: "rgba(37, 99, 235,0.10)", border: "1px solid rgba(37, 99, 235,0.28)" }}>
+            <CheckCircle className="w-7 h-7" style={{ color: "#2563EB" }} />
           </div>
           <div className="absolute -top-1 -right-1">
             <Sparkles className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
@@ -132,7 +132,7 @@ function SuccessContent() {
             ? "Estamos conferindo seu pagamento. Isso leva alguns segundos."
             : finalizeError
               ? finalizeError + ". Aguarde alguns segundos e tente novamente."
-              : "Seu plano foi ativado com sucesso. Aproveite todos os recursos da Uniq.chat."}
+              : "Seu plano foi ativado com sucesso. Aproveite todos os recursos da Qchat."}
         </p>
 
         {sessionId && (
@@ -155,7 +155,7 @@ function SuccessContent() {
           ].map((item) => (
             <div key={item} className="flex items-center gap-2.5 text-xs"
               style={{ color: "var(--text-3)" }}>
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#00d46a" }} />
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#2563EB" }} />
               {item}
             </div>
           ))}
@@ -164,7 +164,7 @@ function SuccessContent() {
         <button
           onClick={() => router.push("/instances")}
           className="w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
-          style={{ background: "#00d46a", color: "#03170a" }}
+          style={{ background: "#2563EB", color: "#03170a" }}
         >
           <span>Ir para o Dashboard</span>
           <ArrowRight className="w-4 h-4" />
@@ -182,7 +182,7 @@ export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-solid)" }}>
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#00d46a" }} />
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#2563EB" }} />
       </div>
     }>
       <SuccessContent />

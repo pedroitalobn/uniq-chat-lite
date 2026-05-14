@@ -1,11 +1,11 @@
 "use client";
 
-// Contexto global da Dynamic Island do Uniq AI.
+// Contexto global da Dynamic Island do QChat AI.
 // Adaptado do PlayerContext de /Users/p/Documents/Dev/obliqthink — simplificado
 // pro caso de uso de chat: idle | expanded | executing | result.
 //
 // `pageContext` é o que cada rota registra (ex: /inbox/[id] registra o
-// instanceId+conversationId atual). O Uniq AI usa pra inferir intents
+// instanceId+conversationId atual). O QChat AI usa pra inferir intents
 // contextuais ("manda mensagem pra ela amanhã" → sabe quem é "ela").
 
 import {
@@ -14,7 +14,7 @@ import {
 } from "react";
 
 export type IslandPageContext = {
-  // Escopo da página atual — usado pelo Uniq AI pra inferir intent contextual.
+  // Escopo da página atual — usado pelo QChat AI pra inferir intent contextual.
   scope: "inbox" | "crm" | "campaigns" | "journeys" | "agents" | "instances" | "home" | "other";
   label?: string;
   meta?: Record<string, unknown>;
@@ -61,7 +61,7 @@ type IslandContextValue = {
 
 const IslandContext = createContext<IslandContextValue | null>(null);
 
-export function UniqAIIslandProvider({ children }: { children: ReactNode }) {
+export function QChatAIIslandProvider({ children }: { children: ReactNode }) {
   const [pageContext, setPageContext] = useState<IslandPageContext | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [executing, setExecuting] = useState<{ preview?: string } | null>(null);
@@ -132,17 +132,17 @@ export function UniqAIIslandProvider({ children }: { children: ReactNode }) {
   return <IslandContext.Provider value={value}>{children}</IslandContext.Provider>;
 }
 
-export function useUniqAIIsland(): IslandContextValue {
+export function useQChatAIIsland(): IslandContextValue {
   const ctx = useContext(IslandContext);
-  if (!ctx) throw new Error("useUniqAIIsland deve ser usado dentro de UniqAIIslandProvider");
+  if (!ctx) throw new Error("useQChatAIIsland deve ser usado dentro de QChatAIIslandProvider");
   return ctx;
 }
 
-// Hook utilitário — cada página registra seu contexto e o Uniq AI usa
+// Hook utilitário — cada página registra seu contexto e o QChat AI usa
 // pra inferir intent. Sem cleanup automático: a próxima navegação chama
 // registerPage com o novo contexto, evitando race nas trocas de rota.
-export function useUniqAIPageContext(ctx: IslandPageContext | null) {
-  const { registerPage } = useUniqAIIsland();
+export function useQChatAIPageContext(ctx: IslandPageContext | null) {
+  const { registerPage } = useQChatAIIsland();
   useEffect(() => {
     registerPage(ctx);
   }, [ctx?.scope, ctx?.label, registerPage]);

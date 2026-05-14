@@ -148,7 +148,7 @@ function channelIcon(channel: string): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  open: { label: "Aberto", color: "#00d46a", bg: "rgba(0,212,106,0.10)" },
+  open: { label: "Aberto", color: "#2563EB", bg: "rgba(37, 99, 235,0.10)" },
   pending: { label: "Pendente", color: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
   snoozed: { label: "Soneca", color: "#94a3b8", bg: "rgba(148,163,184,0.10)" },
   resolved: { label: "Resolvido", color: "#38bdf8", bg: "rgba(56,189,248,0.10)" },
@@ -157,7 +157,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 
 // ─── Mini Sparkline ──────────────────────────────────────────────────────────
 
-function MiniSparkline({ data, color = "#00d46a", width = 80, height = 24 }: { data: number[]; color?: string; width?: number; height?: number }) {
+function MiniSparkline({ data, color = "#2563EB", width = 80, height = 24 }: { data: number[]; color?: string; width?: number; height?: number }) {
   if (!data.length) return <div style={{ width, height }} />;
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -200,8 +200,8 @@ function GlassCard({ children, className = "", style = {} }: { children: React.R
 function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
-        <Icon className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)" }}>
+        <Icon className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
       </div>
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-1)" }}>{title}</h3>
@@ -275,13 +275,13 @@ function ContactHeroCard({
   const avatarUrl = conv.contact?.avatar_url || conv.avatar_url;
 
   const actions = [
-    !conv.assigned_user_id && canAssign && { icon: UserCheck, label: "Atender", onClick: onClaim, color: "#00d46a" },
+    !conv.assigned_user_id && canAssign && { icon: UserCheck, label: "Atender", onClick: onClaim, color: "#2563EB" },
     conv.assigned_user_id && canAssign && { icon: UserX, label: "Remover", onClick: onUnassign, color: "#f59e0b" },
     conv.status !== "resolved" && conv.status !== "closed" && canClose && { icon: CheckCircle2, label: "Resolver", onClick: onResolve, color: "#38bdf8" },
     conv.status === "resolved" && canClose && { icon: CheckCircle2, label: "Encerrar", onClick: onClose, color: "#64748b" },
     (conv.status === "resolved" || conv.status === "closed") && canReopen && { icon: RotateCcw, label: "Reabrir", onClick: onReopen, color: "#f59e0b" },
     conv.status === "open" && canSnooze && { icon: Clock3, label: "Soneca", onClick: onSnooze, color: "#94a3b8" },
-    canUpdate && { icon: Pin, label: conv.is_pinned ? "Desfixar" : "Fixar", onClick: onPin, color: conv.is_pinned ? "#00d46a" : "var(--text-3)" },
+    canUpdate && { icon: Pin, label: conv.is_pinned ? "Desfixar" : "Fixar", onClick: onPin, color: conv.is_pinned ? "#2563EB" : "var(--text-3)" },
     canUpdate && { icon: conv.is_muted ? BellOff : Bell, label: conv.is_muted ? "Reativar" : "Silenciar", onClick: onMute, color: "var(--text-3)" },
   ].filter(Boolean) as Array<{ icon: React.ElementType; label: string; onClick: () => void; color: string }>;
 
@@ -313,8 +313,8 @@ function ContactHeroCard({
                 onClick={() => onModeChange(id)}
                 className="px-2 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
                 style={{
-                  background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                  color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
+                  background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(37, 99, 235,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                  color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#2563EB" : "hsl(240 15% 80%)") : "var(--text-3)",
                 }}>
                 <Icon className="h-3 w-3" />
                 <span className="hidden sm:inline">{label}</span>
@@ -436,7 +436,7 @@ function CRMInsightCards({ workspaceId, contactId }: { workspaceId: string; cont
       label: "Tags",
       value: contact?.tags?.length ? `${contact.tags.length}` : "0",
       sub: contact?.tags?.slice(0, 2).map((t) => t.name).join(", ") || "",
-      color: "#00d46a",
+      color: "#2563EB",
     },
   ];
 
@@ -483,14 +483,14 @@ function InteractionSightTimeline({ workspaceId, conversationId }: { workspaceId
       let title = "";
       let desc = "";
       let icon = "💬";
-      let color = "#00d46a";
+      let color = "#2563EB";
 
       if (item.kind === "message") {
         const p = item.payload as any;
         title = p.direction === "in" ? "Mensagem recebida" : "Mensagem enviada";
         desc = p.content?.slice(0, 60) || "Mídia";
         icon = p.direction === "in" ? "📥" : "📤";
-        color = p.direction === "in" ? "#38bdf8" : "#00d46a";
+        color = p.direction === "in" ? "#38bdf8" : "#2563EB";
       } else if (item.kind === "note") {
         title = "Nota interna";
         desc = (item.payload as any).body?.slice(0, 60) || "";
@@ -513,7 +513,7 @@ function InteractionSightTimeline({ workspaceId, conversationId }: { workspaceId
       <SectionTitle icon={Layers} title="Sight" subtitle="Timeline de interações com o contato" />
       <div className="relative pl-4">
         {/* Vertical line */}
-        <div className="absolute left-[19px] top-2 bottom-2 w-px" style={{ background: "linear-gradient(to bottom, rgba(0,212,106,0.3), transparent)" }} />
+        <div className="absolute left-[19px] top-2 bottom-2 w-px" style={{ background: "linear-gradient(to bottom, rgba(37, 99, 235,0.3), transparent)" }} />
         <div className="space-y-3">
           {events.map((evt, i) => (
             <motion.div

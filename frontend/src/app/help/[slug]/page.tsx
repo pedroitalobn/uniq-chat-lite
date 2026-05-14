@@ -89,7 +89,7 @@ const FONT_STACKS: Record<string, string> = {
 
 function FloatingWidget({ token, config }: { token: string; config: Config }) {
   const [chatOpen, setChatOpen] = useState(false);
-  const color = config.badge_color || config.primary_color || "#00d46a";
+  const color = config.badge_color || config.primary_color || "#2563EB";
   const pos = config.position || "bottom-right";
   const isTop = pos.startsWith("top");
   const isLeft = pos.endsWith("left");
@@ -447,7 +447,7 @@ export default function HelpCenterPage({
 
   // ─── Derived values ───────────────────────────────────────────────────────
 
-  const color = config?.primary_color ?? "#00d46a";
+  const color = config?.primary_color ?? "#2563EB";
   const themeMode = config?.theme_mode ?? "dark";
   const fontFamily =
     FONT_STACKS[config?.font_family ?? "inter"] ?? FONT_STACKS.inter;
@@ -605,7 +605,7 @@ export default function HelpCenterPage({
               {isPassword
                 ? "Esta central de ajuda requer uma senha para acessar."
                 : isUniqUsers
-                ? "Apenas usuários logados no Uniq têm acesso a esta central."
+                ? "Apenas usuários logados no  Qchat têm acesso a esta central."
                 : "Apenas membros da workspace têm acesso a esta central."}
             </p>
           </div>
@@ -1095,7 +1095,7 @@ export default function HelpCenterPage({
               rel="noopener noreferrer"
               style={{ color, textDecoration: "none", fontWeight: 600 }}
             >
-              Uniq Chat
+              Qchat
             </a>
           </p>
         </footer>

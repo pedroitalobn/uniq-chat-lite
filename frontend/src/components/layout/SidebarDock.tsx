@@ -32,8 +32,8 @@ const C = {
   text1:    "rgba(255,255,255,0.88)",
   text2:    "rgba(255,255,255,0.55)",
   text3:    "rgba(255,255,255,0.28)",
-  active:   "#00d46a",
-  activeB:  "rgba(0,212,106,0.14)",
+  active:   "#2563EB",
+  activeB:  "rgba(37, 99, 235,0.14)",
   hover:    "var(--border-default)",
   amber:    "rgba(245,158,11,0.75)",
   amberB:   "rgba(245,158,11,0.08)",
@@ -81,8 +81,8 @@ function NavLink({
           textDecoration: "none",
           flexShrink: 0,
           background: isActive ? C.activeB : hovered ? C.hover : "transparent",
-          border: isActive ? `1px solid rgba(0,212,106,0.28)` : "1px solid transparent",
-          boxShadow: isActive ? "0 0 14px rgba(0,212,106,0.18)" : "none",
+          border: isActive ? `1px solid rgba(37, 99, 235,0.28)` : "1px solid transparent",
+          boxShadow: isActive ? "0 0 14px rgba(37, 99, 235,0.18)" : "none",
           color: isActive ? C.active : hovered ? C.text1 : C.text2,
           transition: "all 0.18s cubic-bezier(0.34,1.56,0.64,1)",
           transform: hovered && !expanded ? "scale(1.10)" : "scale(1)",
@@ -94,7 +94,7 @@ function NavLink({
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, position: "relative",
           borderRadius: 8,
-          background: isActive ? "rgba(0,212,106,0.18)" : "transparent",
+          background: isActive ? "rgba(37, 99, 235,0.18)" : "transparent",
         }}>
           <Icon style={{ width: 16, height: 16 }} strokeWidth={isActive ? 2.2 : 1.8} />
           {/* Badge dot when collapsed */}
@@ -308,7 +308,7 @@ export function SidebarDock() {
     // ganham gate de plano (eram bloqueados por isBeta antes). Os
     // demais ficam perm-only pra não esconder de plano pago cujo
     // session.user.plan não traz allow_* preenchido.
-    { href: "/uniq-ai",      label: "Uniq AI",              icon: Sparkles,       show: canSeeUniqAi },
+    { href: "/uniq-ai",      label: "QChat AI",              icon: Sparkles,       show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),     icon: LayoutDashboard, show: canSeeDashboard },
     { href: "/inbox",        label: t("nav_inbox"),         icon: Headset,         show: canSeeInbox, badge: unreadCount > 0 ? unreadCount : undefined },
     { href: "/crm",          label: t("nav_crm"),           icon: Contact,         show: canSeeCRM },
@@ -329,7 +329,7 @@ export function SidebarDock() {
     ...(features.billing ? [{ href: "/admin/plans", label: t("nav_plans"), icon: CreditCard }] : []),
     { href: "/admin/providers",   label: "Providers",     icon: Layers },
     { href: "/admin/branding",    label: "Branding",      icon: Sparkles },
-    // Uniq AI vive como aba dentro de /admin/providers (?tab=ai)
+    // QChat AI vive como aba dentro de /admin/providers (?tab=ai)
     { href: "/admin/inspect",     label: "Inspect",       icon: Server },
   ];
 
@@ -444,7 +444,7 @@ export function SidebarDock() {
             label="Fazer upgrade"
             expanded={expanded}
             onClick={() => router.push("/settings?section=billing")}
-            color="#00d46a"
+            color="#2563EB"
           />
         </div>
       )}
@@ -743,7 +743,7 @@ function WorkspaceSection({
                       width: "100%", display: "flex", alignItems: "center", gap: 10,
                       padding: "8px 10px", borderRadius: 10,
                       border: "none", cursor: "pointer",
-                      background: isCurrent ? "rgba(0,212,106,0.10)" : "transparent",
+                      background: isCurrent ? "rgba(37, 99, 235,0.10)" : "transparent",
                       color: isCurrent ? C.active : C.text1,
                       fontSize: 13, fontWeight: 500, textAlign: "left",
                       transition: "background 0.12s",
@@ -1052,7 +1052,7 @@ function MobileDrawer({
           </div>
           <div>
             <p style={{ fontSize: 13, fontWeight: 700, color: C.text1, margin: 0 }}>
-              {currentWorkspace?.name || "Uniq"}
+              {currentWorkspace?.name || "Qchat"}
             </p>
             <p style={{ fontSize: 10, color: currentWorkspace?.is_owner ? "#fbbf24" : C.text3, margin: 0 }}>
               {currentWorkspace?.is_owner ? "Proprietário" : "Membro"}
@@ -1080,7 +1080,7 @@ function MobileDrawer({
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   padding: "6px 8px", borderRadius: 9, border: "none", cursor: "pointer",
-                  background: isCurrent ? "rgba(0,212,106,0.10)" : "transparent",
+                  background: isCurrent ? "rgba(37, 99, 235,0.10)" : "transparent",
                   color: isCurrent ? C.active : C.text2,
                   fontSize: 12, fontWeight: 500,
                 }}

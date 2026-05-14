@@ -119,7 +119,7 @@ export default function CompaniesPage() {
             <Link
               key={co.id}
               href={`/crm/companies/${co.id}`}
-              className="rounded-xl p-4 transition-all hover:border-[rgba(0,212,106,0.3)]"
+              className="rounded-xl p-4 transition-all hover:border-[rgba(37, 99, 235,0.3)]"
               style={cardStyle}
             >
               <div className="flex items-start gap-3">
@@ -129,7 +129,7 @@ export default function CompaniesPage() {
                 ) : (
                   <div
                     className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: "rgba(0,212,106,0.08)" }}
+                    style={{ background: "rgba(37, 99, 235,0.08)" }}
                   >
                     <Building2 className="h-5 w-5" style={{ color: uniq.green }} />
                   </div>

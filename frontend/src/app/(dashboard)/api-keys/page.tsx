@@ -67,7 +67,7 @@ export default function ApiKeysPage() {
           API Keys
         </h1>
         <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
-          Gerencie chaves de API para integrar o Uniq.chat com seus sistemas.
+          Gerencie chaves de API para integrar o Qchat com seus sistemas.
         </p>
       </div>
 
@@ -76,7 +76,7 @@ export default function ApiKeysPage() {
         <div className="flex items-center gap-3 mb-1">
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}
+            style={{ background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.15)" }}
           >
             <Key className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
@@ -108,7 +108,7 @@ export default function ApiKeysPage() {
         {createdKey && (
           <div
             className="rounded-xl p-4 space-y-3 animate-fade-in-up"
-            style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.15)" }}
+            style={{ background: "rgba(37, 99, 235,0.05)", border: "1px solid rgba(37, 99, 235,0.15)" }}
           >
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />

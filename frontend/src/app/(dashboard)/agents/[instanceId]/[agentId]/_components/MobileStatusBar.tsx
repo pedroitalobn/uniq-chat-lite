@@ -29,9 +29,9 @@ export function MobileStatusBar({ form }: { form: AgentForm }) {
         className="lg:hidden w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-colors"
         style={{
           background: isReady
-            ? "linear-gradient(135deg, rgba(0,212,106,0.06), rgba(0,212,106,0.02))"
+            ? "linear-gradient(135deg, rgba(37, 99, 235,0.06), rgba(37, 99, 235,0.02))"
             : "var(--surface-1)",
-          border: `1px solid ${isReady ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+          border: `1px solid ${isReady ? "rgba(37, 99, 235,0.20)" : "var(--surface-border)"}`,
         }}
       >
         <CheckCircle2
@@ -48,7 +48,7 @@ export function MobileStatusBar({ form }: { form: AgentForm }) {
         <span
           className="ml-auto inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
           style={{
-            background: form.is_active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
+            background: form.is_active ? "rgba(37, 99, 235,0.10)" : "var(--surface-2)",
             color: form.is_active ? "var(--green)" : "var(--text-4)",
           }}
         >

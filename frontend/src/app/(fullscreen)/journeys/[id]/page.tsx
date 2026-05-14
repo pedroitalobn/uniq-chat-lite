@@ -3,7 +3,7 @@
 // Conversational Builder de Jornadas — UX agent-os style.
 //
 // O canvas ReactFlow continua disponível em /journeys/[id]/canvas pra
-// edição avançada, mas a entrada principal aqui é CHAT com Uniq AI:
+// edição avançada, mas a entrada principal aqui é CHAT com QChat AI:
 //
 //   1. User descreve o que quer ("manda boas-vindas + pergunta o
 //      objetivo + cria deal no CRM")
@@ -76,7 +76,7 @@ const QUICK_ACTIONS: Array<{
   icon: typeof MessageSquare;
   color: string;
 }> = [
-  { label: "WhatsApp msg",        prompt: "Adicione uma mensagem WhatsApp com o texto: ",             icon: MessageSquare, color: "#00d46a" },
+  { label: "WhatsApp msg",        prompt: "Adicione uma mensagem WhatsApp com o texto: ",             icon: MessageSquare, color: "#2563EB" },
   { label: "Email",               prompt: "Envie um email com assunto e corpo: ",                     icon: Mail,          color: "#3b82f6" },
   { label: "SMS",                 prompt: "Envie um SMS com o texto: ",                                icon: Smartphone,    color: "#ec4899" },
   { label: "Adicionar pergunta",  prompt: "Adicione uma pergunta ao usuário: ",                       icon: Hand,          color: "#fbbf24" },
@@ -128,10 +128,10 @@ export default function JourneyConversationalBuilderPage() {
         id: rand(),
         role: "assistant",
         text: hasFlow
-          ? `Oi! Sou a Uniq AI. Esta jornada tem ${flow!.steps!.length} passo${
+          ? `Oi! Sou a QChat AI. Esta jornada tem ${flow!.steps!.length} passo${
               flow!.steps!.length !== 1 ? "s" : ""
             }. Quer ajustar algo? Pode pedir em texto ou usar os atalhos abaixo.`
-          : "Oi! Sou a Uniq AI. Descreve aqui o que essa jornada deve fazer (ex: \"manda boas-vindas, pergunta o objetivo do cliente, cria um deal no CRM\") e eu monto os passos pra você.",
+          : "Oi! Sou a QChat AI. Descreve aqui o que essa jornada deve fazer (ex: \"manda boas-vindas, pergunta o objetivo do cliente, cria um deal no CRM\") e eu monto os passos pra você.",
         ts: Date.now(),
       },
     ]);
@@ -272,8 +272,8 @@ export default function JourneyConversationalBuilderPage() {
         <span
           className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.05))",
-            border: "1px solid rgba(0,212,106,0.30)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.05))",
+            border: "1px solid rgba(37, 99, 235,0.30)",
             color: "var(--green)",
           }}
         >
@@ -307,8 +307,8 @@ export default function JourneyConversationalBuilderPage() {
             onClick={() => setEnrollOpen(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
             style={{
-              background: "rgba(0,212,106,0.10)",
-              border: "1px solid rgba(0,212,106,0.25)",
+              background: "rgba(37, 99, 235,0.10)",
+              border: "1px solid rgba(37, 99, 235,0.25)",
               color: "var(--green)",
             }}
             title="Enrolar contatos manualmente nesta jornada"
@@ -336,8 +336,8 @@ export default function JourneyConversationalBuilderPage() {
             style={
               isActive
                 ? {
-                    background: "rgba(0,212,106,0.12)",
-                    border: "1px solid rgba(0,212,106,0.30)",
+                    background: "rgba(37, 99, 235,0.12)",
+                    border: "1px solid rgba(37, 99, 235,0.30)",
                     color: "var(--green)",
                   }
                 : {
@@ -375,7 +375,7 @@ export default function JourneyConversationalBuilderPage() {
               <div className="flex items-center gap-2 px-3 py-2">
                 <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--text-3)" }} />
                 <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                  Uniq AI montando a mudança…
+                  QChat AI montando a mudança…
                 </span>
               </div>
             )}
@@ -471,9 +471,9 @@ export default function JourneyConversationalBuilderPage() {
               <span
                 className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
                 style={{
-                  background: "rgba(0,212,106,0.10)",
+                  background: "rgba(37, 99, 235,0.10)",
                   color: "var(--green)",
-                  border: "1px solid rgba(0,212,106,0.20)",
+                  border: "1px solid rgba(37, 99, 235,0.20)",
                 }}
               >
                 {changedStepIds.size} alterado{changedStepIds.size !== 1 ? "s" : ""}

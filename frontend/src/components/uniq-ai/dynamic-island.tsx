@@ -1,6 +1,6 @@
 "use client";
 
-// Dynamic Island do Uniq AI — pill/bubble flutuante que dá acesso ao chat
+// Dynamic Island do QChat AI — pill/bubble flutuante que dá acesso ao chat
 // global em qualquer página. Inspirado no iOS 16+ Dynamic Island.
 //
 // Layouts:
@@ -17,11 +17,11 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
-import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
+import { QChatAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
 import { loadModelPref } from "@/features/uniq-ai/model-preference";
-import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
-import { useUniqAIIsland } from "./island-context";
+import { QChatAIBrandMark } from "@/components/uniq-ai/brand-mark";
+import { useQChatAIIsland } from "./island-context";
 import { useConversationWS } from "@/hooks/useConversationWS";
 
 function shouldHide(pathname: string, isMobile: boolean): boolean {
@@ -45,8 +45,8 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
-export function UniqAIIsland() {
-  const { state, open, close, dismissNotification, pushNotification } = useUniqAIIsland();
+export function QChatAIIsland() {
+  const { state, open, close, dismissNotification, pushNotification } = useQChatAIIsland();
 
   // Realtime subscriber: nova mensagem inbound + venda + campanha viram
   // notificações inline. Cada página pode também chamar pushNotification
@@ -130,15 +130,15 @@ export function UniqAIIsland() {
             className="fixed bottom-4 right-4 z-[100] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
             style={{
               background: "var(--green)",
-              boxShadow: "0 8px 32px rgba(0,212,106,0.35), inset 0 0 0 1px var(--border-strong)",
+              boxShadow: "0 8px 32px rgba(37, 99, 235,0.35), inset 0 0 0 1px var(--border-strong)",
             }}
-            aria-label="Abrir Uniq AI"
+            aria-label="Abrir QChat AI"
           >
             {state.mode === "executing"
               ? <Loader2 className="w-6 h-6 text-white animate-spin" />
               : state.mode === "result"
                 ? <CheckCircle2 className="w-6 h-6 text-white" />
-                : <UniqAIBrandMark className="w-6 h-6" stroke="white" />}
+                : <QChatAIBrandMark className="w-6 h-6" stroke="white" />}
           </motion.button>
         )}
 
@@ -165,7 +165,7 @@ export function UniqAIIsland() {
                   <div className="w-10 h-1 rounded-full" style={{ background: "var(--surface-border)" }} />
                 </button>
                 <div className="flex-1 min-h-0">
-                  <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
+                  <QChatAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
                 </div>
               </motion.div>
             </>
@@ -181,7 +181,7 @@ export function UniqAIIsland() {
               exit={{ opacity: 0, y: 30, scale: 0.92 }}
               transition={{ type: "spring", stiffness: 380, damping: 28 }}
               className="fixed bottom-20 right-4 z-[99] max-w-[85vw] rounded-2xl px-4 py-3 shadow-2xl flex items-center gap-2"
-              style={{ background: "rgba(0,212,106,0.95)", color: "white" }}
+              style={{ background: "rgba(37, 99, 235,0.95)", color: "white" }}
             >
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               <span className="text-xs font-medium truncate">{state.result.text}</span>
@@ -221,7 +221,7 @@ export function UniqAIIsland() {
     <motion.div
       onClick={isNotif ? undefined : (isExpanded ? close : open)}
       role="button"
-      aria-label={isExpanded ? "Fechar Uniq AI" : "Abrir Uniq AI"}
+      aria-label={isExpanded ? "Fechar QChat AI" : "Abrir QChat AI"}
       animate={{ width: target.width, height: target.height }}
       transition={islandSpring}
       className="fixed top-3 z-[90] overflow-hidden rounded-full flex items-center gap-2 px-3 cursor-pointer"
@@ -230,14 +230,14 @@ export function UniqAIIsland() {
         transform: "translateX(-50%)",
         maxWidth: "calc(100vw - 2rem)",
         background: isExpanded
-          ? "rgba(0,212,106,0.12)"
+          ? "rgba(37, 99, 235,0.12)"
           : "rgba(10, 12, 14, 0.94)",
         backdropFilter: "blur(12px)",
         border: isExpanded
-          ? "1px solid rgba(0,212,106,0.35)"
+          ? "1px solid rgba(37, 99, 235,0.35)"
           : "1px solid var(--border-default)",
         boxShadow: isExpanded
-          ? "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,106,0.2), inset 0 1px 0 var(--border-subtle)"
+          ? "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(37, 99, 235,0.2), inset 0 1px 0 var(--border-subtle)"
           : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
         transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
       }}
@@ -258,7 +258,7 @@ export function UniqAIIsland() {
         ) : state.mode === "notification" ? (
           notifKindIcon(state.notification.kind)
         ) : (
-          <UniqAIBrandMark className="w-3.5 h-3.5" stroke="white" />
+          <QChatAIBrandMark className="w-3.5 h-3.5" stroke="white" />
         )}
       </div>
 
@@ -271,7 +271,7 @@ export function UniqAIIsland() {
             </span>
           ) : (
             <>
-              <span className="text-xs font-medium text-white/90 whitespace-nowrap">Uniq AI</span>
+              <span className="text-xs font-medium text-white/90 whitespace-nowrap">QChat AI</span>
               {(() => {
                 const pref = loadModelPref();
                 return pref ? (
@@ -339,7 +339,7 @@ export function UniqAIIsland() {
           className="flex items-center gap-2 flex-1 min-w-0"
         >
           <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--green)" }}>
-            Uniq AI
+            QChat AI
           </span>
           <motion.span
             className="text-[10px] whitespace-nowrap"
@@ -358,7 +358,7 @@ export function UniqAIIsland() {
 
 // Mantenho o ícone exportado pro caso de qualquer outra superfície querer
 // disparar o "abrir DI" via botão próprio (header de uma página, etc).
-export { MessageSquare as UniqAIIconAlt };
+export { MessageSquare as QChatAIIconAlt };
 
 // ─── Notification kind → icon + cor ──────────────────────────────────
 function notifKindColor(kind: string): string {

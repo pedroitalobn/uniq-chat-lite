@@ -194,7 +194,7 @@ export default function EmbedChatPage() {
     }
   };
 
-  const primaryColor = config?.primary_color ?? "#00d46a";
+  const primaryColor = config?.primary_color ?? "#2563EB";
   const displayName = config?.display_name ?? "Chat";
 
   // Loading config state

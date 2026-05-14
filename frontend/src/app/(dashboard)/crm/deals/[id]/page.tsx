@@ -426,9 +426,9 @@ function StageStepper({ stages, currentStageId, onSelect, disabled }: {
             onClick={() => onSelect(s.id)}
             className="flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium transition-all disabled:cursor-default"
             style={{
-              background: isCurrent ? "rgba(0,212,106,0.1)" : "transparent",
+              background: isCurrent ? "rgba(37, 99, 235,0.1)" : "transparent",
               color: chipColor,
-              border: `1px solid ${isCurrent ? "rgba(0,212,106,0.25)" : "transparent"}`,
+              border: `1px solid ${isCurrent ? "rgba(37, 99, 235,0.25)" : "transparent"}`,
             }}
           >
             <span

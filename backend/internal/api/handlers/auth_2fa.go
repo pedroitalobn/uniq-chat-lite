@@ -40,7 +40,7 @@ func (h *AuthHandler) Setup2FA(c *fiber.Ctx) error {
 			"error": "2FA já está ativo. Desative antes de gerar novo secret.",
 		})
 	}
-	issuer := "Uniq Chat"
+	issuer := "Qchat"
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      issuer,
 		AccountName: user.Email,

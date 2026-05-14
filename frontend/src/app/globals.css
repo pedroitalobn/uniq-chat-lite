@@ -39,11 +39,11 @@
     --radius: 0.75rem;
 
     /* Brand */
-    --green: #00d46a;
+    --green: #2563EB;
     --green-strong: #00ff7f;
-    --green-soft: rgba(0, 212, 106, 0.12);
-    --green-dim: rgba(0, 212, 106, 0.08);
-    --green-border: rgba(0, 212, 106, 0.22);
+    --green-soft: rgba(37, 99, 235, 0.12);
+    --green-dim: rgba(37, 99, 235, 0.08);
+    --green-border: rgba(37, 99, 235, 0.22);
     --green-fg: #03170a; /* texto sobre o verde */
 
     /* Surface ladder — com alpha pra deixar o gradient mesh vazar e dar
@@ -99,7 +99,7 @@
     --radius-pill: 9999px;
 
     /* Hero gradient — usado em landing surfaces de feature */
-    --hero-gradient: radial-gradient(80% 60% at 50% 0%, rgba(0, 212, 106, 0.12) 0%, transparent 60%);
+    --hero-gradient: radial-gradient(80% 60% at 50% 0%, rgba(37, 99, 235, 0.12) 0%, transparent 60%);
 
     /* Backdrop overlay (modais/drawers) — sempre escurece, mesmo no dark */
     --surface-overlay: rgba(0, 0, 0, 0.55);
@@ -128,7 +128,7 @@
     --ring: 148 80% 32%;
 
     --green: #009a4e;
-    --green-strong: #00b85c;
+    --green-strong: #1D4ED8;
     --green-soft: rgba(0, 154, 78, 0.12);
     --green-dim: rgba(0, 154, 78, 0.06);
     --green-border: rgba(0, 154, 78, 0.25);
@@ -189,11 +189,11 @@
   ────────────────────────────────────────────────────────────────────── */
   html {
     background:
-      radial-gradient(ellipse 60% 45% at 12%  6%,  rgba(0, 212, 106, 0.08) 0%, transparent 68%),
+      radial-gradient(ellipse 60% 45% at 12%  6%,  rgba(37, 99, 235, 0.08) 0%, transparent 68%),
       radial-gradient(ellipse 55% 40% at 88%  4%,  rgba(99, 102, 241, 0.07) 0%, transparent 65%),
       radial-gradient(ellipse 45% 55% at 4%  58%,  rgba(139, 92, 246, 0.05) 0%, transparent 68%),
       radial-gradient(ellipse 50% 45% at 94% 52%,  rgba(59, 130, 246, 0.045) 0%, transparent 65%),
-      radial-gradient(ellipse 70% 35% at 50% 100%, rgba(0, 212, 106, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 35% at 50% 100%, rgba(37, 99, 235, 0.04) 0%, transparent 60%),
       radial-gradient(ellipse 40% 40% at 50%  48%, rgba(99, 102, 241, 0.025) 0%, transparent 70%),
       hsl(240 28% 1.2%);
     min-height: 100vh;
@@ -441,10 +441,10 @@
     box-shadow: 0 0 30px var(--green-soft), 0 0 60px var(--green-dim);
   }
   .glow-green-sm {
-    box-shadow: 0 0 10px rgba(0,212,106,0.2), 0 0 20px rgba(0,212,106,0.08);
+    box-shadow: 0 0 10px rgba(37, 99, 235,0.2), 0 0 20px rgba(37, 99, 235,0.08);
   }
   .glow-green-xs {
-    box-shadow: 0 0 6px rgba(0,212,106,0.35);
+    box-shadow: 0 0 6px rgba(37, 99, 235,0.35);
   }
 
   /* Gradient top border trick */
@@ -806,8 +806,8 @@ html { scroll-behavior: smooth; }
 
 /* ─── Sidebar nav active item glow ────────────────────────────────── */
 @keyframes nav-glow {
-  0%,100% { box-shadow: 0 0 12px rgba(0,212,106,0.12); }
-  50%     { box-shadow: 0 0 20px rgba(0,212,106,0.22); }
+  0%,100% { box-shadow: 0 0 12px rgba(37, 99, 235,0.12); }
+  50%     { box-shadow: 0 0 20px rgba(37, 99, 235,0.22); }
 }
 .nav-item-active {
   animation: nav-glow 3s ease-in-out infinite;
@@ -836,7 +836,7 @@ html { scroll-behavior: smooth; }
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(0,212,106,0.4), rgba(99,102,241,0.2), rgba(0,212,106,0.1));
+  background: linear-gradient(135deg, rgba(37, 99, 235,0.4), rgba(99,102,241,0.2), rgba(37, 99, 235,0.1));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -914,7 +914,7 @@ html { scroll-behavior: smooth; }
     135deg,
     var(--border-default) 0%,
     var(--input) 60%,
-    rgba(0, 212, 106, 0.02) 100%
+    rgba(37, 99, 235, 0.02) 100%
   );
   border: 1px solid var(--border-strong);
   box-shadow:
@@ -951,7 +951,7 @@ html { scroll-behavior: smooth; }
     0 20px 40px rgba(0, 0, 0, 0.35),
     0 40px 60px rgba(0, 0, 0, 0.20),
     inset 0 1px 0 var(--border-strong),
-    0 0 0 1px rgba(0, 212, 106, 0.08);
+    0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
 /* ── Ambient Light (luz difusa vinda de cima) ─────────────── */
@@ -986,7 +986,7 @@ html { scroll-behavior: smooth; }
     135deg,
     var(--border-strong) 0%,
     var(--input) 30%,
-    rgba(0, 212, 106, 0.10) 70%,
+    rgba(37, 99, 235, 0.10) 70%,
     var(--border-default) 100%
   );
   z-index: -1;
@@ -1056,7 +1056,7 @@ html { scroll-behavior: smooth; }
   opacity: 0.18;
 }
 .orb-green {
-  background: radial-gradient(circle, #00d46a 0%, transparent 70%);
+  background: radial-gradient(circle, #2563EB 0%, transparent 70%);
 }
 .orb-blue {
   background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
@@ -1177,7 +1177,7 @@ html { scroll-behavior: smooth; }
   background: var(--border-subtle);
 }
 .uniq-input-dark:focus {
-  border-color: rgba(0, 212, 106, 0.45);
+  border-color: rgba(37, 99, 235, 0.45);
   background: var(--border-subtle);
 }
 .uniq-input-dark::placeholder {
@@ -1216,7 +1216,7 @@ html { scroll-behavior: smooth; }
 
   /* Tap highlight discreto verde — substitui o azul/cinza padrão */
   * {
-    -webkit-tap-highlight-color: rgba(0, 212, 106, 0.18);
+    -webkit-tap-highlight-color: rgba(37, 99, 235, 0.18);
   }
 
   /* Botões ganham pressed-state mais perceptível */

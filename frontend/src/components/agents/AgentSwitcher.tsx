@@ -82,8 +82,8 @@ export function AgentSwitcher({
                 onClick={() => onSelect(a.id)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition"
                 style={{
-                  background: isActive ? "rgba(0,212,106,0.12)" : "var(--surface-3)",
-                  border: `1px solid ${isActive ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+                  background: isActive ? "rgba(37, 99, 235,0.12)" : "var(--surface-3)",
+                  border: `1px solid ${isActive ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
                   color: isActive ? "var(--green)" : "var(--text-2)",
                 }}
               >

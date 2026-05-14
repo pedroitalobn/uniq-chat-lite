@@ -18,7 +18,7 @@ interface EditState {
   // Limites globais
   max_instances: number;
   max_messages_per_day: number;
-  // Credits (Uniq Credits — Phase 1+ usage system)
+  // Credits (Qchat Credits — Phase 1+ usage system)
   ai_credits_included_per_cycle: number;
   voice_credits_included_per_cycle: number;
   message_credits_included_per_cycle: number;
@@ -184,7 +184,7 @@ function HighlightsEditor({ highlights, onChange }: { highlights: string[]; onCh
           type="button"
           onClick={add}
           className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg transition-colors"
-          style={{ color: "var(--green)", background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.18)" }}
+          style={{ color: "var(--green)", background: "rgba(37, 99, 235,0.08)", border: "1px solid rgba(37, 99, 235,0.18)" }}
         >
           <Plus className="w-3 h-3" /> Adicionar
         </button>
@@ -206,7 +206,7 @@ function HighlightsEditor({ highlights, onChange }: { highlights: string[]; onCh
                       className="flex items-center gap-2"
                       style={{
                         ...dragProvided.draggableProps.style,
-                        background: snapshot.isDragging ? "rgba(0,212,106,0.05)" : undefined,
+                        background: snapshot.isDragging ? "rgba(37, 99, 235,0.05)" : undefined,
                         borderRadius: snapshot.isDragging ? 8 : 0,
                       }}
                     >
@@ -280,8 +280,8 @@ function FeatureGrid({ checkboxes, onChange }: { checkboxes: Record<string, bool
         {FEATURE_KEYS.map(({ key, label, icon }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-xl transition-colors overflow-hidden min-w-0"
             style={{
-              background: checkboxes[key] ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
-              border: checkboxes[key] ? "1px solid rgba(0,212,106,0.18)" : "1px solid var(--border-default)",
+              background: checkboxes[key] ? "rgba(37, 99, 235,0.06)" : "var(--surface-2)",
+              border: checkboxes[key] ? "1px solid rgba(37, 99, 235,0.18)" : "1px solid var(--border-default)",
             }}>
             <span className="text-sm leading-none flex-shrink-0">{icon}</span>
             <span className="text-xs flex-1 truncate min-w-0" style={{ color: checkboxes[key] ? "var(--text-1)" : "var(--text-3)" }}>{label}</span>
@@ -529,7 +529,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   color: activeTab === tab.id ? "var(--green)" : "var(--text-3)",
                   borderColor: activeTab === tab.id ? "var(--green)" : "transparent",
                   background: activeTab === tab.id
-                    ? "linear-gradient(180deg, rgba(0,212,106,0.06) 0%, transparent 100%)"
+                    ? "linear-gradient(180deg, rgba(37, 99, 235,0.06) 0%, transparent 100%)"
                     : "transparent",
                   transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
@@ -600,12 +600,12 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   <NumField label="Envios diários" value={form.max_messages_per_day} onChange={(v) => setForm({ ...form, max_messages_per_day: v })} />
                 </div>
 
-                {/* Uniq Credits — allowance mensal por categoria. Free
+                {/* Qchat Credits — allowance mensal por categoria. Free
                     plan zero em tudo = PAYG puro (user só usa AI/Voice
                     se comprar topup). overage_allowed_default vira o
                     default da quota; user pode mudar pelo painel /usage. */}
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>
-                  Uniq Credits (allowance mensal — 0 = PAYG)
+                  Qchat Credits (allowance mensal — 0 = PAYG)
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Créditos AI / mês" value={form.ai_credits_included_per_cycle} onChange={(v) => setForm({ ...form, ai_credits_included_per_cycle: v })} />
@@ -631,7 +631,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>Por módulo</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Max. Agentes IA" value={form.max_agents} onChange={(v) => setForm({ ...form, max_agents: v })}
-                    mismatchHint={maxMismatchHint("Uniq AI / Agentes", form.allow_ai, form.max_agents)} />
+                    mismatchHint={maxMismatchHint("QChat AI / Agentes", form.allow_ai, form.max_agents)} />
                   <NumField label="Max. Jornadas" value={form.max_journeys} onChange={(v) => setForm({ ...form, max_journeys: v })}
                     mismatchHint={maxMismatchHint("Jornadas", form.allow_journeys, form.max_journeys)} />
                   <NumField label="Max. Campanhas" value={form.max_campaigns} onChange={(v) => setForm({ ...form, max_campaigns: v })}
@@ -705,9 +705,9 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
 
                 {/* IA & Automação — agentes, jornadas, triggers */}
                 <FeatureGroup title="Automação & IA">
-                  <FeatureToggle label="Uniq AI / Agentes" desc="/agents — RAG + tools + voz (TTS) + IVC"
+                  <FeatureToggle label="QChat AI / Agentes" desc="/agents — RAG + tools + voz (TTS) + IVC"
                     checked={form.allow_ai} onChange={(v) => setForm({ ...form, allow_ai: v })} color="#a78bfa" />
-                  <FeatureToggle label="Uniq Voice" desc="TTS gerenciado pela plataforma + provider próprio"
+                  <FeatureToggle label="Qchat Voice" desc="TTS gerenciado pela plataforma + provider próprio"
                     checked={form.allow_voice} onChange={(v) => setForm({ ...form, allow_voice: v })} color="#f59e0b" />
                   <FeatureToggle label="Jornadas" desc="/journeys — flow builder de automações"
                     checked={form.allow_journeys} onChange={(v) => setForm({ ...form, allow_journeys: v })} color="#60a5fa" />
@@ -882,7 +882,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
           <div className="flex items-center gap-2 mb-0.5">
             <h3 className="font-semibold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
             {plan.is_active ? 
-              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
+              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(37, 99, 235,0.08)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.15)" }}>Ativo</span> : 
               <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
           </div>
           <p className="text-sm font-medium truncate" style={{ color: style.accent }}>
@@ -935,12 +935,12 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
           onClick={onEdit} 
           className="btn-primary px-3 py-1.5 text-[10px] rounded-lg flex items-center gap-1.5 flex-shrink-0 transition-all active:scale-95 shadow-lg group-hover:shadow-green-500/10" 
           style={{ 
-            background: "rgba(0,212,106,0.08)", 
-            border: "1px solid rgba(0,212,106,0.18)", 
+            background: "rgba(37, 99, 235,0.08)", 
+            border: "1px solid rgba(37, 99, 235,0.18)", 
             color: "var(--green)" 
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.15)" }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.08)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(37, 99, 235,0.15)" }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(37, 99, 235,0.08)" }}
         >
           <Edit2 className="w-3 h-3" />
           <span>Editar</span>
@@ -980,9 +980,9 @@ export default function AdminPlansPage() {
           <button
             onClick={() => setActivePlanDrawer("new")}
             className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
-            style={{ color: "var(--green)", background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.18)" }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
+            style={{ color: "var(--green)", background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(37, 99, 235,0.18)" }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(37, 99, 235,0.1)" }}
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Novo Plano</span>
@@ -1043,7 +1043,7 @@ export default function AdminPlansPage() {
 const PREVIEW_META: Record<string, { color: string }> = {
   Free:     { color: "#60a5fa" },
   Starter:  { color: "#fb923c" },
-  Pro:      { color: "#00d46a" },
+  Pro:      { color: "#2563EB" },
   Business: { color: "#a78bfa" },
   Lifetime: { color: "#fbbf24" },
   _default: { color: "#c084fc" },

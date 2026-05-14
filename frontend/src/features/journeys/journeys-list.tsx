@@ -173,7 +173,7 @@ function EditJourneyModal({
                 {msg.role === "user" ? <User className="w-4 h-4" style={{ color: "var(--text-2)" }} /> : <SparklesIcon className="w-4 h-4 text-white" />}
               </div>
               <div className={cn("flex-1 max-w-[85%] min-w-0", msg.role === "user" && "text-right")}>
-                <p className="text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>{msg.role === "user" ? "Você" : "Uniq AI"}</p>
+                <p className="text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>{msg.role === "user" ? "Você" : "QChat AI"}</p>
                 <div className={cn("rounded-xl p-3 text-sm break-words", msg.role === "user" ? "bg-[var(--surface-3)]" : "bg-[var(--surface-2)]")} style={{ color: "var(--text-1)" }}>
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
@@ -375,7 +375,7 @@ export function JourneysList() {
                 onClick={() => setStatusFilter(s.id)}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-md transition-colors"
                 style={{
-                  background: statusFilter === s.id ? "rgba(0,212,106,0.15)" : "transparent",
+                  background: statusFilter === s.id ? "rgba(37, 99, 235,0.15)" : "transparent",
                   color: statusFilter === s.id ? "var(--green)" : "var(--text-3)",
                 }}
               >
@@ -437,7 +437,7 @@ export function JourneysList() {
               }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
               style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(37, 99, 235,0.18)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
             >
               <Plus className="w-4 h-4" />
@@ -461,10 +461,10 @@ export function JourneysList() {
                 background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
                 backdropFilter: "blur(20px) saturate(180%)",
                 WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: j.status === "active" ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-default)",
-                borderLeft: j.status === "active" ? "3px solid rgba(0,212,106,0.60)" : "3px solid var(--border-default)",
+                border: j.status === "active" ? "1px solid rgba(37, 99, 235,0.20)" : "1px solid var(--border-default)",
+                borderLeft: j.status === "active" ? "3px solid rgba(37, 99, 235,0.60)" : "3px solid var(--border-default)",
                 boxShadow: j.status === "active"
-                  ? "0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,212,106,0.10), inset 0 1px 0 var(--border-default)"
+                  ? "0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(37, 99, 235,0.10), inset 0 1px 0 var(--border-default)"
                   : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
                 transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
@@ -486,8 +486,8 @@ export function JourneysList() {
                     {/* Status indicator */}
                     {j.status === "active" ? (
                       <span className="relative flex-shrink-0">
-                        <span className="w-2 h-2 rounded-full block" style={{ background: "#00d46a" }} />
-                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: "#00d46a", opacity: 0.4 }} />
+                        <span className="w-2 h-2 rounded-full block" style={{ background: "#2563EB" }} />
+                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: "#2563EB", opacity: 0.4 }} />
                       </span>
                     ) : (
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#475569" }} />
@@ -518,7 +518,7 @@ export function JourneysList() {
                     )}
                     {j.active_executions > 0 && (
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
-                        style={{ background: "rgba(0,212,106,0.14)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.22)" }}>
+                        style={{ background: "rgba(37, 99, 235,0.14)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.22)" }}>
                         <Activity className="w-2.5 h-2.5" />
                         {j.active_executions} ativa{j.active_executions > 1 ? "s" : ""}
                       </span>
@@ -535,7 +535,7 @@ export function JourneysList() {
                     {j.invocations > 0 && j.completion_rate != null && (
                       <>
                         <span className="text-xs opacity-30 hidden sm:inline">·</span>
-                        <span className="text-xs font-medium" style={{ color: j.completion_rate >= 70 ? "#00d46a" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444" }}>
+                        <span className="text-xs font-medium" style={{ color: j.completion_rate >= 70 ? "#2563EB" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444" }}>
                           {j.completion_rate.toFixed(0)}% conclusão
                         </span>
                       </>
@@ -547,8 +547,8 @@ export function JourneysList() {
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${Math.min(100, j.completion_rate || 0)}%`,
-                          background: j.completion_rate >= 70 ? "#00d46a" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444",
-                          boxShadow: j.status === "active" ? "0 0 6px rgba(0,212,106,0.40)" : "none",
+                          background: j.completion_rate >= 70 ? "#2563EB" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444",
+                          boxShadow: j.status === "active" ? "0 0 6px rgba(37, 99, 235,0.40)" : "none",
                         }} />
                     </div>
                   )}
@@ -557,7 +557,7 @@ export function JourneysList() {
                   <button
                     onClick={() => toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" })}
                     className="p-2 rounded-lg transition-colors"
-                    style={{ color: j.status === "active" ? "#00d46a" : "var(--text-3)", background: j.status === "active" ? "rgba(0,212,106,0.1)" : "transparent" }}
+                    style={{ color: j.status === "active" ? "#2563EB" : "var(--text-3)", background: j.status === "active" ? "rgba(37, 99, 235,0.1)" : "transparent" }}
                     title={j.status === "active" ? "Pausar" : "Ativar"}
                   >
                     {j.status === "active" ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -601,7 +601,7 @@ export function JourneysList() {
                           try {
                             const kws = JSON.parse(j.keywords || "[]") || [];
                             return kws.length > 0 ? kws.map((kw: string, i: number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(37, 99, 235,0.1)", color: "var(--green)" }}>
                                 {kw}
                               </span>
                             )) : <span className="text-xs" style={{ color: "var(--text-3)" }}>qualquer mensagem</span>;
@@ -628,7 +628,7 @@ export function JourneysList() {
                     <a
                       href={`/journeys/${j.id}`}
                       className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                      style={{ background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+                      style={{ background: "rgba(37, 99, 235,0.12)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.25)" }}
                     >
                       <Wand2 className="w-3.5 h-3.5" /> Canvas
                     </a>

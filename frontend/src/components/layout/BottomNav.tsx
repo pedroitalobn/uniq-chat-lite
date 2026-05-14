@@ -74,11 +74,11 @@ export function BottomNav() {
                   className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl"
                   style={active
                     ? {
-                        background: "rgba(0,212,106,0.12)",
+                        background: "rgba(37, 99, 235,0.12)",
                         backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(0,212,106,0.25)",
+                        border: "1px solid rgba(37, 99, 235,0.25)",
                         borderRadius: "12px",
-                        boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                        boxShadow: "0 0 16px rgba(37, 99, 235,0.15)",
                         color: "var(--green)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
@@ -114,11 +114,11 @@ export function BottomNav() {
               className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl"
               style={isMoreActive
                 ? {
-                    background: "rgba(0,212,106,0.12)",
+                    background: "rgba(37, 99, 235,0.12)",
                     backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(0,212,106,0.25)",
+                    border: "1px solid rgba(37, 99, 235,0.25)",
                     borderRadius: "12px",
-                    boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                    boxShadow: "0 0 16px rgba(37, 99, 235,0.15)",
                     color: "var(--green)",
                     transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                   }
@@ -190,10 +190,10 @@ export function BottomNav() {
                   className="flex flex-col items-center gap-1.5 p-3 rounded-xl"
                   style={active
                     ? {
-                        background: "rgba(0,212,106,0.12)",
+                        background: "rgba(37, 99, 235,0.12)",
                         backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(0,212,106,0.25)",
-                        boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                        border: "1px solid rgba(37, 99, 235,0.25)",
+                        boxShadow: "0 0 16px rgba(37, 99, 235,0.15)",
                         color: "var(--green)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }

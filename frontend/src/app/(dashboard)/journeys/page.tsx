@@ -3,12 +3,12 @@
 // Módulo Jornadas — top-level. Versão enxuta:
 //
 //   • 1 CTA PRIMÁRIO ("Nova jornada") cria blank e leva direto pro
-//     Conversational Builder com Uniq AI já pronta pra ajudar.
+//     Conversational Builder com QChat AI já pronta pra ajudar.
 //   • 1 CTA SECUNDÁRIO ("Templates") abre o modal — único caminho
 //     pra ver templates pré-montados.
 //   • Estado vazio com explicação visual dos 2 caminhos pra começar.
 //
-// Antes a página tinha 3 botões competindo (Uniq AI / Templates /
+// Antes a página tinha 3 botões competindo (QChat AI / Templates /
 // Canvas) + um grid de preview de templates + botão duplicado
 // "Ver todos templates" dentro do grid. Confundia o user sobre por
 // onde começar. Esta versão consolida tudo num fluxo único.
@@ -46,7 +46,7 @@ export default function JourneysPage() {
   const isEmpty = !journeysQ.isLoading && journeyCount === 0;
 
   // CTA primário: cria journey blank e leva pro Conversational
-  // Builder. A Uniq AI já cumprimenta o user lá ("descreve o que
+  // Builder. A QChat AI já cumprimenta o user lá ("descreve o que
   // essa jornada deve fazer") — sem fricção.
   const createBlank = async () => {
     if (creating) return;
@@ -75,7 +75,7 @@ export default function JourneysPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <p className="text-xs sm:text-sm max-w-2xl" style={{ color: "var(--text-3)" }}>
             Sequências automáticas de mensagens que rodam sozinhas. Crie do zero conversando com a
-            Uniq AI ou comece a partir de um template pronto.
+            QChat AI ou comece a partir de um template pronto.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -99,7 +99,7 @@ export default function JourneysPage() {
                 background: "var(--green)",
                 color: "var(--green-fg)",
               }}
-              title="Criar uma jornada conversando com a Uniq AI (sem trocar de página)"
+              title="Criar uma jornada conversando com a QChat AI (sem trocar de página)"
             >
               <Sparkles className="w-4 h-4" />
               Nova jornada
@@ -143,10 +143,10 @@ export default function JourneysPage() {
                   )}
                   style={{
                     background: isActive
-                      ? "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.08) 100%)"
+                      ? "linear-gradient(135deg, rgba(37, 99, 235,0.18) 0%, rgba(37, 99, 235,0.08) 100%)"
                       : "transparent",
                     backdropFilter: isActive ? "blur(8px)" : "none",
-                    border: isActive ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
+                    border: isActive ? "1px solid rgba(37, 99, 235,0.20)" : "1px solid transparent",
                     color: isActive ? "var(--green)" : "var(--text-3)",
                     transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
@@ -195,8 +195,8 @@ function EmptyHero({
           <span
             className="inline-flex w-12 h-12 rounded-2xl items-center justify-center"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.06))",
-              border: "1px solid rgba(0,212,106,0.30)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.06))",
+              border: "1px solid rgba(37, 99, 235,0.30)",
               color: "var(--green)",
             }}
           >
@@ -218,16 +218,16 @@ function EmptyHero({
             disabled={creating}
             className="text-left rounded-2xl p-5 transition-all group disabled:opacity-60"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.03))",
-              border: "1px solid rgba(0,212,106,0.30)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.10), rgba(37, 99, 235,0.03))",
+              border: "1px solid rgba(37, 99, 235,0.30)",
             }}
           >
             <div className="flex items-start gap-3">
               <span
                 className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: "rgba(0,212,106,0.15)",
-                  border: "1px solid rgba(0,212,106,0.30)",
+                  background: "rgba(37, 99, 235,0.15)",
+                  border: "1px solid rgba(37, 99, 235,0.30)",
                   color: "var(--green)",
                 }}
               >
@@ -236,7 +236,7 @@ function EmptyHero({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-                    Conversar com a Uniq AI
+                    Conversar com a QChat AI
                   </p>
                   <span
                     className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-semibold"

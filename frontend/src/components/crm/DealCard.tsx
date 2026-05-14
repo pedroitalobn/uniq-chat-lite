@@ -68,7 +68,7 @@ export function DealCard({ deal, isDragging = false }: { deal: DealCardData; isD
       href={`/crm/deals/${deal.id}`}
       className="group block rounded-xl overflow-hidden transition-all hover:scale-[1.01]"
       style={{
-        background: isDragging ? "rgba(0,212,106,0.08)" : uniq.panel,
+        background: isDragging ? "rgba(37, 99, 235,0.08)" : uniq.panel,
         border: `1px solid ${isDragging ? uniq.greenBorder : uniq.borderFaint}`,
         borderLeft: `3px solid ${priorityColor}80`,
         boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.35)" : undefined,

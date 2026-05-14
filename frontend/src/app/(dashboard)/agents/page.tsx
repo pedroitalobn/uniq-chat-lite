@@ -137,8 +137,8 @@ function InstanceCard({
           <span
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.15), rgba(0,212,106,0.05))",
-              border: "1px solid rgba(0,212,106,0.20)",
+              background: "linear-gradient(135deg, rgba(37, 99, 235,0.15), rgba(37, 99, 235,0.05))",
+              border: "1px solid rgba(37, 99, 235,0.20)",
               color: "var(--green)",
             }}
           >
@@ -177,9 +177,9 @@ function InstanceCard({
                 <span
                   className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
                   style={{
-                    background: "rgba(0,212,106,0.10)",
+                    background: "rgba(37, 99, 235,0.10)",
                     color: "var(--green)",
-                    border: "1px solid rgba(0,212,106,0.20)",
+                    border: "1px solid rgba(37, 99, 235,0.20)",
                   }}
                 >
                   online
@@ -237,9 +237,9 @@ function InstanceCard({
           href={`/agents/${instance.id}/primary`}
           className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-opacity hover:opacity-90"
           style={{
-            background: hasAgent ? "var(--green)" : "rgba(0,212,106,0.08)",
+            background: hasAgent ? "var(--green)" : "rgba(37, 99, 235,0.08)",
             color: hasAgent ? "var(--green-fg)" : "var(--green)",
-            border: hasAgent ? "none" : "1px solid rgba(0,212,106,0.20)",
+            border: hasAgent ? "none" : "1px solid rgba(37, 99, 235,0.20)",
           }}
         >
           {hasAgent ? <Settings2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}

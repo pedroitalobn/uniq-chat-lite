@@ -763,7 +763,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               })()}
               {conv?.instance?.name && (
                 <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
-                  style={{ background: "rgba(0,212,106,0.06)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.18)" }}>
+                  style={{ background: "rgba(37, 99, 235,0.06)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.18)" }}>
                   {conv.instance.name}
                 </span>
               )}
@@ -1231,11 +1231,11 @@ function TransferDialog({
             <div
               className="flex h-8 w-8 items-center justify-center rounded-lg"
               style={{
-                background: "rgba(0,212,106,0.12)",
-                border: "1px solid rgba(0,212,106,0.22)",
+                background: "rgba(37, 99, 235,0.12)",
+                border: "1px solid rgba(37, 99, 235,0.22)",
               }}
             >
-              <ArrowRightLeft className="h-4 w-4" style={{ color: "#00d46a" }} />
+              <ArrowRightLeft className="h-4 w-4" style={{ color: "#2563EB" }} />
             </div>
             <div className="leading-tight">
               <h2 id="transfer-dialog-title" className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
@@ -1272,15 +1272,15 @@ function TransferDialog({
                 onClick={() => setTab(t)}
                 className="relative flex-1 px-3 py-2.5 text-xs font-medium transition-colors"
                 style={{
-                  color: active ? "#00d46a" : "var(--text-3)",
-                  background: active ? "rgba(0,212,106,0.06)" : "transparent",
+                  color: active ? "#2563EB" : "var(--text-3)",
+                  background: active ? "rgba(37, 99, 235,0.06)" : "transparent",
                 }}
               >
                 {label}
                 {active && (
                   <span
                     className="absolute inset-x-0 bottom-0 h-[2px]"
-                    style={{ background: "#00d46a", boxShadow: "0 0 8px rgba(0,212,106,0.45)" }}
+                    style={{ background: "#2563EB", boxShadow: "0 0 8px rgba(37, 99, 235,0.45)" }}
                   />
                 )}
               </button>
@@ -1308,7 +1308,7 @@ function TransferDialog({
                         onClick={() => setSelected(o.id)}
                         className="flex w-full items-center justify-between px-5 py-2.5 text-left text-sm transition-colors"
                         style={{
-                          background: isSelected ? "rgba(0,212,106,0.10)" : "transparent",
+                          background: isSelected ? "rgba(37, 99, 235,0.10)" : "transparent",
                           color: "var(--text-1)",
                         }}
                         onMouseEnter={(e) => {
@@ -1331,7 +1331,7 @@ function TransferDialog({
                         {isSelected && (
                           <span
                             className="ml-3 flex h-4 w-4 items-center justify-center rounded-full"
-                            style={{ background: "#00d46a", color: "#03170a" }}
+                            style={{ background: "#2563EB", color: "#03170a" }}
                           >
                             <Check className="h-2.5 w-2.5" strokeWidth={3} />
                           </span>
@@ -1361,7 +1361,7 @@ function TransferDialog({
               color: "var(--text-1)",
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = "rgba(0,212,106,0.45)";
+              e.currentTarget.style.borderColor = "rgba(37, 99, 235,0.45)";
               e.currentTarget.style.background = "var(--border-subtle)";
             }}
             onBlur={(e) => {
@@ -1388,9 +1388,9 @@ function TransferDialog({
               disabled={!selected}
               className="rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
               style={{
-                background: "#00d46a",
+                background: "#2563EB",
                 color: "#03170a",
-                boxShadow: selected ? "0 0 16px rgba(0,212,106,0.32)" : "none",
+                boxShadow: selected ? "0 0 16px rgba(37, 99, 235,0.32)" : "none",
               }}
             >
               Transferir
@@ -1437,8 +1437,8 @@ function MessageBubble({
         <div
           className="rounded-2xl px-3 py-1 text-2xl uniq-slide-up"
           style={{
-            background: isOut ? "rgba(0,212,106,0.12)" : "var(--surface-2)",
-            border: `1px solid ${isOut ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
+            background: isOut ? "rgba(37, 99, 235,0.12)" : "var(--surface-2)",
+            border: `1px solid ${isOut ? "rgba(37, 99, 235,0.25)" : "var(--border-default)"}`,
           }}
         >
           {parsed.text || "👍"}
@@ -1448,7 +1448,7 @@ function MessageBubble({
   }
 
   // Mídia pura (image/video/audio/sticker sem caption) → render SEM bubble.
-  // Bordas finas com cor da direção indicam emissor (verde Uniq) vs
+  // Bordas finas com cor da direção indicam emissor (azul Qchat) vs
   // receptor (cinza). Mais limpo, dá destaque visual à mídia.
   // Documentos, location, contact, poll sempre vão pra dentro do bubble
   // (cards verticais com layout próprio). Sticker fica isolado pra dar
@@ -1474,7 +1474,7 @@ function MessageBubble({
                   borderRadius: 14,
                   padding: 3,
                   background: isOut
-                    ? "linear-gradient(135deg, rgba(0,212,106,0.35), rgba(0,212,106,0.15))"
+                    ? "linear-gradient(135deg, rgba(37, 99, 235,0.35), rgba(37, 99, 235,0.15))"
                     : "linear-gradient(135deg, var(--border-strong), var(--border-default))",
                 }
           }
@@ -1490,7 +1490,7 @@ function MessageBubble({
           {m.is_pinned && (
             <span
               className="absolute -top-2 left-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-              style={{ background: "#00d46a", color: "#03170a" }}
+              style={{ background: "#2563EB", color: "#03170a" }}
               title="Fixada"
             >
               <Pin className="h-2.5 w-2.5" /> fixada
@@ -1521,7 +1521,7 @@ function MessageBubble({
             style={{ color: "var(--text-3)" }}
           >
             {!isOut && m.sender_name ? (
-              <span style={{ color: "#00d46a", fontWeight: 500 }}>{m.sender_name}</span>
+              <span style={{ color: "#2563EB", fontWeight: 500 }}>{m.sender_name}</span>
             ) : <span />}
             <span className="flex items-center gap-1">
               {relativeTime(m.created_at)}
@@ -1558,14 +1558,14 @@ function MessageBubble({
         style={
           isOut
             ? {
-                background: "rgba(0,212,106,0.12)",
-                border: `1px solid ${m.is_pinned ? "#00d46a" : "rgba(0,212,106,0.25)"}`,
+                background: "rgba(37, 99, 235,0.12)",
+                border: `1px solid ${m.is_pinned ? "#2563EB" : "rgba(37, 99, 235,0.25)"}`,
                 color: "var(--text-1)",
                 borderBottomRightRadius: 6,
               }
             : {
                 background: "var(--surface-2)",
-                border: `1px solid ${m.is_pinned ? "#00d46a" : "var(--border-default)"}`,
+                border: `1px solid ${m.is_pinned ? "#2563EB" : "var(--border-default)"}`,
                 color: "var(--text-1)",
                 borderBottomLeftRadius: 6,
               }
@@ -1574,7 +1574,7 @@ function MessageBubble({
         {m.is_pinned && (
           <span
             className="absolute -top-2 left-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-            style={{ background: "#00d46a", color: "#03170a" }}
+            style={{ background: "#2563EB", color: "#03170a" }}
             title="Fixada"
           >
             <Pin className="h-2.5 w-2.5" /> fixada
@@ -1593,7 +1593,7 @@ function MessageBubble({
         {!isOut && m.sender_name && (
           <div
             className="mb-0.5 text-[11px] font-medium"
-            style={{ color: "#00d46a" }}
+            style={{ color: "#2563EB" }}
           >
             {m.sender_name}
           </div>
@@ -1979,7 +1979,7 @@ function MediaBody({
               className="flex items-start gap-2 px-2.5 py-2"
               style={{ background: "var(--surface-overlay)" }}
             >
-              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: isLive ? "#ef4444" : "#00d46a" }} />
+              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: isLive ? "#ef4444" : "#2563EB" }} />
               <div className="min-w-0 flex-1">
                 {isLive && (
                   <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: "#ef4444" }}>
@@ -2113,9 +2113,9 @@ function MediaBody({
               const className =
                 "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors";
               const style: React.CSSProperties = {
-                background: "rgba(0,212,106,0.08)",
-                border: "1px solid rgba(0,212,106,0.22)",
-                color: "#00d46a",
+                background: "rgba(37, 99, 235,0.08)",
+                border: "1px solid rgba(37, 99, 235,0.22)",
+                color: "#2563EB",
                 justifyContent: isURL ? "flex-start" : "center",
               };
               if (isURL) {
@@ -2193,9 +2193,9 @@ function MediaBody({
           <div
             className="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium"
             style={{
-              background: "rgba(0,212,106,0.06)",
-              border: "1px solid rgba(0,212,106,0.2)",
-              color: "#00d46a",
+              background: "rgba(37, 99, 235,0.06)",
+              border: "1px solid rgba(37, 99, 235,0.2)",
+              color: "#2563EB",
             }}
           >
             <ListChecks className="h-3 w-3" /> {parsed.listButtonText}
@@ -2244,7 +2244,7 @@ function CallCard({ parsed, isOut }: { parsed: ParsedContent; isOut: boolean }) 
   const status = parsed.callStatus || "missed";
   const dur = parsed.callDurationSec;
   const missed = status === "missed" || status === "rejected" || status === "timeout";
-  const color = missed ? "#ef4444" : "#00d46a";
+  const color = missed ? "#ef4444" : "#2563EB";
   const Icon = missed ? PhoneMissed : isVideo ? VideoIcon : Phone;
   const labelByStatus: Record<string, string> = {
     missed: "Chamada perdida",
@@ -2264,7 +2264,7 @@ function CallCard({ parsed, isOut }: { parsed: ParsedContent; isOut: boolean }) 
       className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 max-w-[280px]"
       style={{
         background: "var(--surface-2)",
-        border: `1px solid ${missed ? "rgba(239,68,68,0.25)" : "rgba(0,212,106,0.2)"}`,
+        border: `1px solid ${missed ? "rgba(239,68,68,0.25)" : "rgba(37, 99, 235,0.2)"}`,
       }}
     >
       <div
@@ -2294,7 +2294,7 @@ function QuotedReply({
   reply: NonNullable<MessagePayload["reply_to"]>;
   isOut: boolean;
 }) {
-  const accent = reply.direction === "out" ? "#00d46a" : "hsl(240 8% 70%)";
+  const accent = reply.direction === "out" ? "#2563EB" : "hsl(240 8% 70%)";
   const isMedia = reply.type && reply.type !== "text" && reply.type !== "reaction";
   const typeLabel = REPLY_TYPE_LABELS[reply.type || ""] || reply.type;
   const showThumb = !!reply.media_url && (reply.type === "image" || (reply.mime_type || "").startsWith("image/"));
@@ -2398,9 +2398,9 @@ function ContactCard({
         <div
           className="flex h-10 w-10 items-center justify-center rounded-full font-medium flex-shrink-0"
           style={{
-            background: "rgba(0,212,106,0.1)",
-            color: "#00d46a",
-            border: "1px solid rgba(0,212,106,0.25)",
+            background: "rgba(37, 99, 235,0.1)",
+            color: "#2563EB",
+            border: "1px solid rgba(37, 99, 235,0.25)",
           }}
         >
           {name.split(/\s+/).slice(0, 2).map(p => p[0] || "").join("").toUpperCase()}
@@ -2440,9 +2440,9 @@ function ContactCard({
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 rounded-md flex-1 py-1.5 text-[11px] font-medium transition-colors"
             style={{
-              background: "rgba(0,212,106,0.12)",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.25)",
+              background: "rgba(37, 99, 235,0.12)",
+              color: "#2563EB",
+              border: "1px solid rgba(37, 99, 235,0.25)",
             }}
             title="Abrir conversa no WhatsApp"
           >
@@ -2475,11 +2475,11 @@ function ContactCard({
 function PresenceLabel({ presence }: { presence: { online?: boolean; lastSeen?: string; typing?: boolean } }) {
   if (presence.typing) {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#00d46a" }}>
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#2563EB" }}>
         <span className="inline-flex gap-0.5">
-          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite" }} />
-          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite 0.15s" }} />
-          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite 0.3s" }} />
+          <span className="h-1 w-1 rounded-full" style={{ background: "#2563EB", animation: "uniq-typing-dot 1.2s infinite" }} />
+          <span className="h-1 w-1 rounded-full" style={{ background: "#2563EB", animation: "uniq-typing-dot 1.2s infinite 0.15s" }} />
+          <span className="h-1 w-1 rounded-full" style={{ background: "#2563EB", animation: "uniq-typing-dot 1.2s infinite 0.3s" }} />
         </span>
         digitando…
       </span>
@@ -2487,8 +2487,8 @@ function PresenceLabel({ presence }: { presence: { online?: boolean; lastSeen?: 
   }
   if (presence.online) {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#00d46a" }}>
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#00d46a" }} />
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#2563EB" }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#2563EB" }} />
         online
       </span>
     );
@@ -2715,7 +2715,7 @@ function MessageActionsToolbar({
             onClick={() => onPatch({ is_pinned: !m.is_pinned })}
             className="rounded-full p-0.5 hover:bg-white/10"
             title={m.is_pinned ? "Desfixar" : "Fixar"}
-            style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
+            style={{ color: m.is_pinned ? "#2563EB" : "hsl(240 8% 62%)" }}
           >
             <Pin className="h-3 w-3" />
           </button>
@@ -2787,7 +2787,7 @@ function Text({ text }: { text: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium hover:underline"
-                style={{ color: "#00d46a" }}
+                style={{ color: "#2563EB" }}
                 onClick={(e) => e.stopPropagation()}
                 title={`Abrir conversa com ${phone}`}
               >
@@ -2988,7 +2988,7 @@ function TranscriptionBlock({
       >
         <span
           className="inline-block w-1.5 h-1.5 rounded-full"
-          style={{ background: "#00d46a", animation: "pulse 1.4s ease-in-out infinite" }}
+          style={{ background: "#2563EB", animation: "pulse 1.4s ease-in-out infinite" }}
         />
         Transcrevendo áudio…
       </div>
@@ -3006,7 +3006,7 @@ function TranscriptionBlock({
         toast.success("Transcrição reagendada");
       } catch (e: unknown) {
         const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-          || "Não foi possível reagendar — verifique se a Uniq AI está configurada";
+          || "Não foi possível reagendar — verifique se a QChat AI está configurada";
         toast.error(msg);
       } finally {
         setRetrying(false);
@@ -3025,7 +3025,7 @@ function TranscriptionBlock({
           width: "fit-content",
           maxWidth: "100%",
         }}
-        title="Re-tenta transcrição via Uniq AI"
+        title="Re-tenta transcrição via QChat AI"
       >
         {retrying ? (
           <Loader2 className="w-2.5 h-2.5 animate-spin" />
@@ -3047,7 +3047,7 @@ function TranscriptionBlock({
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
       }}
-      title="Transcrição automática (Uniq AI)"
+      title="Transcrição automática (QChat AI)"
     >
       <span
         className="text-[9px] uppercase tracking-widest font-semibold mr-1.5 opacity-60"
@@ -3070,7 +3070,7 @@ function StatusTicks({ status, deliveryError }: { status?: string; deliveryError
     );
   }
   if (status === "read") {
-    return <CheckCheck className="h-3 w-3" style={{ color: "#00d46a" }} />;
+    return <CheckCheck className="h-3 w-3" style={{ color: "#2563EB" }} />;
   }
   if (status === "delivered") {
     return <CheckCheck className="h-3 w-3" />;
@@ -3573,7 +3573,7 @@ function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const accentBg = mode === "note" ? "#f59e0b" : "#00d46a";
+  const accentBg = mode === "note" ? "#f59e0b" : "#2563EB";
   const accentFg = mode === "note" ? "#1f1300" : "#03170a";
   const composerBg = mode === "note" ? "rgba(245,158,11,0.06)" : "hsl(240 18% 6.5%)";
 
@@ -3596,9 +3596,9 @@ function Composer({
         <div
           className="absolute inset-0 z-20 flex items-center justify-center rounded-md pointer-events-none"
           style={{
-            background: "rgba(0,212,106,0.1)",
-            border: "2px dashed #00d46a",
-            color: "#00d46a",
+            background: "rgba(37, 99, 235,0.1)",
+            border: "2px dashed #2563EB",
+            color: "#2563EB",
           }}
         >
           <span className="text-sm font-medium">Solte para anexar</span>
@@ -3621,7 +3621,7 @@ function Composer({
           className="rounded-md px-2 py-1 font-medium transition-colors"
           style={
             mode === "message"
-              ? { background: "#00d46a", color: "#03170a" }
+              ? { background: "#2563EB", color: "#03170a" }
               : { color: "hsl(240 8% 52%)" }
           }
           disabled={!canSend}
@@ -3671,7 +3671,7 @@ function Composer({
                 onClick={onPickFile}
                 disabled={uploading || pending.length >= MAX_ATTACHMENTS}
                 className="text-[10px] font-medium hover:underline disabled:opacity-40"
-                style={{ color: "#00d46a" }}
+                style={{ color: "#2563EB" }}
               >
                 + Adicionar
               </button>
@@ -3717,14 +3717,14 @@ function Composer({
                 ) : (
                   <div
                     className="flex h-16 w-full items-center justify-center rounded-t-md"
-                    style={{ background: "rgba(0,212,106,0.08)" }}
+                    style={{ background: "rgba(37, 99, 235,0.08)" }}
                   >
                     {att.file.type.startsWith("audio/") ? (
-                      <Mic className="h-6 w-6" style={{ color: "#00d46a" }} />
+                      <Mic className="h-6 w-6" style={{ color: "#2563EB" }} />
                     ) : att.file.type.startsWith("video/") ? (
-                      <ImageIcon className="h-6 w-6" style={{ color: "#00d46a" }} />
+                      <ImageIcon className="h-6 w-6" style={{ color: "#2563EB" }} />
                     ) : (
-                      <FileText className="h-6 w-6" style={{ color: "#00d46a" }} />
+                      <FileText className="h-6 w-6" style={{ color: "#2563EB" }} />
                     )}
                   </div>
                 )}
@@ -3769,7 +3769,7 @@ function Composer({
                     onClick={() => applyQuickReply(qr)}
                     className="flex w-full items-start gap-3 px-3 py-2 text-left"
                     style={{
-                      background: i === pickerIndex ? "rgba(0,212,106,0.08)" : "transparent",
+                      background: i === pickerIndex ? "rgba(37, 99, 235,0.08)" : "transparent",
                     }}
                   >
                     <span
@@ -3802,13 +3802,13 @@ function Composer({
           <div
             className="mb-2 flex items-start gap-2 rounded-md px-3 py-2 text-[11px]"
             style={{
-              background: "rgba(0,212,106,0.06)",
-              borderLeft: "3px solid #00d46a",
+              background: "rgba(37, 99, 235,0.06)",
+              borderLeft: "3px solid #2563EB",
             }}
           >
-            <CornerUpLeft className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: "#00d46a" }} />
+            <CornerUpLeft className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: "#2563EB" }} />
             <div className="min-w-0 flex-1">
-              <div className="font-medium" style={{ color: "#00d46a" }}>
+              <div className="font-medium" style={{ color: "#2563EB" }}>
                 Respondendo a {replyTo.sender_name || (replyTo.direction === "out" ? "você" : "cliente")}
               </div>
               <div className="truncate" style={{ color: "hsl(240 15% 80%)" }}>
@@ -3986,7 +3986,7 @@ function Composer({
               height: 44,
               background: accentBg,
               color: accentFg,
-              boxShadow: "0 2px 8px rgba(0,212,106,0.25)",
+              boxShadow: "0 2px 8px rgba(37, 99, 235,0.25)",
             }}
           >
             {mode === "note" ? <StickyNote className="h-5 w-5" /> : <Send className="h-5 w-5" />}
@@ -4041,7 +4041,7 @@ function Composer({
                 style={{
                   background: "var(--surface-2)",
                   border: "1px solid var(--border-default)",
-                  color: emojiOpen ? "#00d46a" : "var(--text-2)",
+                  color: emojiOpen ? "#2563EB" : "var(--text-2)",
                 }}
               >
                 <Smile className="h-4 w-4" />
@@ -4265,15 +4265,15 @@ function ActionRow({
           border: "1px solid var(--border)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,212,106,0.06)";
-          e.currentTarget.style.borderColor = "rgba(0,212,106,0.25)";
+          e.currentTarget.style.background = "rgba(37, 99, 235,0.06)";
+          e.currentTarget.style.borderColor = "rgba(37, 99, 235,0.25)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
           e.currentTarget.style.borderColor = "var(--border-default)";
         }}
       >
-        <span style={{ color: "#00d46a" }}>{icon}</span>
+        <span style={{ color: "#2563EB" }}>{icon}</span>
         {label}
       </button>
     );
@@ -4346,7 +4346,7 @@ function ForwardDialog({
           </button>
         </div>
         <div className="px-4 py-3">
-          <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)", borderLeft: "3px solid #00d46a" }}>
+          <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)", borderLeft: "3px solid #2563EB" }}>
             <div className="font-medium" style={{ color: "var(--text-1)" }}>
               {msg.sender_name || (msg.direction === "out" ? "Você" : "Cliente")}
             </div>
@@ -4372,7 +4372,7 @@ function ForwardDialog({
                       <button type="button" onClick={() => toggle(c.id)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/5" style={{ color: "var(--text-1)" }}>
                         <span className="min-w-0 flex-1 truncate">{c.contact?.name || c.push_name || c.subject || c.channel_key}</span>
                         {isSel ? (
-                          <Check className="h-4 w-4 flex-shrink-0" style={{ color: "#00d46a" }} />
+                          <Check className="h-4 w-4 flex-shrink-0" style={{ color: "#2563EB" }} />
                         ) : (
                           <span className="h-4 w-4 flex-shrink-0 rounded-full border" style={{ borderColor: "hsl(240 8% 30%)" }} />
                         )}
@@ -4386,7 +4386,7 @@ function ForwardDialog({
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
-          <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+          <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#2563EB", color: "#03170a" }}>
             {isPending ? "Enviando…" : `Encaminhar ${selected.size > 0 ? `(${selected.size})` : ""}`}
           </button>
         </div>
@@ -4420,7 +4420,7 @@ function EditMessageDialog({
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
-          <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+          <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#2563EB", color: "#03170a" }}>
             {isPending ? "Salvando…" : "Salvar"}
           </button>
         </div>
@@ -4470,13 +4470,13 @@ function MessageInfoDialog({
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <StatusCard label="Entregue" when={msg.delivered_at || data?.delivered_at} icon={<CheckCheck className="h-3 w-3" />} color="hsl(240 8% 65%)" />
-            <StatusCard label="Lida" when={msg.read_at || data?.read_at} icon={<CheckCheck className="h-3 w-3" />} color="#00d46a" />
+            <StatusCard label="Lida" when={msg.read_at || data?.read_at} icon={<CheckCheck className="h-3 w-3" />} color="#2563EB" />
           </div>
           {(data?.read?.length || data?.delivered?.length) ? (
             <div className="space-y-3">
               {data && data.read.length > 0 && (
                 <div>
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "#00d46a" }}>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "#2563EB" }}>
                     <CheckCheck className="h-3 w-3" /> Lida por · {data.read.length}
                   </div>
                   <ul className="space-y-1">
@@ -4772,7 +4772,7 @@ function SnoozeDialog({
                 onClick={() => submit(hours)}
                 disabled={hours <= 0}
                 className="ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                style={{ background: "#00d46a", color: "#03170a" }}
+                style={{ background: "#2563EB", color: "#03170a" }}
               >
                 Aplicar
               </button>
@@ -4808,7 +4808,7 @@ function CallButton({ instanceId, jid }: { instanceId: string; jid: string }) {
       disabled={calling}
       title="Ligar para o contato via WhatsApp"
       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0 transition-all disabled:opacity-50"
-      style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}
+      style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)", color: "#2563EB" }}
     >
       <Phone className="h-3 w-3" />
       <span className="hidden sm:inline">{calling ? "Ligando..." : "Ligar"}</span>

@@ -198,7 +198,7 @@ func (h *AdminBillingHandler) CreateCustomInvoice(c *fiber.Ctx) error {
 	}
 	description := strings.TrimSpace(req.Description)
 	if description == "" {
-		description = "Cobrança avulsa — Uniq Chat"
+		description = "Cobrança avulsa — Qchat"
 	}
 
 	payload := map[string]any{
@@ -380,7 +380,7 @@ func (h *AdminBillingHandler) CreateCheckoutLink(c *fiber.Ctx) error {
 	}
 	planName := strings.TrimSpace(req.PlanName)
 	if planName == "" {
-		planName = "Cobrança Uniq Chat"
+		planName = "Cobrança Qchat"
 	}
 	description := strings.TrimSpace(req.Description)
 	if description == "" {
@@ -462,11 +462,11 @@ func (h *AdminBillingHandler) SendCheckoutLink(c *fiber.Ctx) error {
 	}
 	subject := strings.TrimSpace(req.Subject)
 	if subject == "" {
-		subject = "Link de pagamento — Uniq Chat"
+		subject = "Link de pagamento — Qchat"
 	}
 	message := strings.TrimSpace(req.Message)
 	if message == "" {
-		message = "A equipe Uniq Chat gerou um link de pagamento pra você."
+		message = "A equipe Qchat gerou um link de pagamento pra você."
 	}
 	html := buildCheckoutLinkEmail(user.Name, "Pagamento solicitado", 0, req.URL, message)
 	if err := h.emailSvc.SyncSend(user.Email, subject, html, "billing_checkout_link"); err != nil {
@@ -495,7 +495,7 @@ func buildCheckoutLinkEmail(name, planName string, value float64, url, message s
 <p style="margin:0 0 6px 0;color:#475569;">Cobrança: <strong>` + planName + `</strong></p>
 ` + valStr + `
 <p style="margin:24px 0;text-align:center;">
-  <a href="` + url + `" style="display:inline-block;padding:12px 28px;background:#00d46a;color:#03170a;border-radius:10px;text-decoration:none;font-weight:600;">Pagar agora</a>
+  <a href="` + url + `" style="display:inline-block;padding:12px 28px;background:#2563EB;color:#03170a;border-radius:10px;text-decoration:none;font-weight:600;">Pagar agora</a>
 </p>
 <p style="font-size:12px;color:#64748b;margin:24px 0 0 0;">Ou abra esse endereço no navegador: <br/><a href="` + url + `" style="color:#0ea5e9;word-break:break-all;">` + url + `</a></p>
 <p style="font-size:11px;color:#94a3b8;margin-top:24px;">Pagamento processado com segurança pelo Asaas — autorizado pelo BACEN.</p>

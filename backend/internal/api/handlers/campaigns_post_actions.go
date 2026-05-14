@@ -16,7 +16,7 @@ import (
 //
 // Tipos suportados (todos best-effort, idempotentes):
 //
-//   add_tag          : {"type":"add_tag","tag":"VIP","color":"#00d46a"}
+//   add_tag          : {"type":"add_tag","tag":"VIP","color":"#2563EB"}
 //   remove_tag       : {"type":"remove_tag","tag":"frio"}
 //   move_stage       : {"type":"move_stage","funnel_id":"...","stage_id":"...",
 //                       "create_if_missing":true}
@@ -154,7 +154,7 @@ func postActionAddTag(db *gorm.DB, contact *models.Contact, a CampaignPostAction
 	}
 	color := a.Color
 	if color == "" {
-		color = "#00d46a"
+		color = "#2563EB"
 	}
 	wsID := uuid.Nil
 	if contact.WorkspaceID != nil {

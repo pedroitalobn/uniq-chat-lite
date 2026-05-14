@@ -221,7 +221,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                 <Link
                   key={d.id}
                   href={`/crm/deals/${d.id}`}
-                  className="flex items-center justify-between rounded-xl p-3 transition-colors hover:border-[rgba(0,212,106,0.3)]"
+                  className="flex items-center justify-between rounded-xl p-3 transition-colors hover:border-[rgba(37, 99, 235,0.3)]"
                   style={cardStyle}
                 >
                   <div>
@@ -267,7 +267,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                       {g.role !== "member" && (
                         <span
                           className="rounded-full px-1.5 py-0.5 text-[9px]"
-                          style={{ background: "rgba(0,212,106,0.1)", color: uniq.green }}
+                          style={{ background: "rgba(37, 99, 235,0.1)", color: uniq.green }}
                         >
                           {g.role}
                         </span>
@@ -443,7 +443,7 @@ function Avatar({ name, url, size = 36 }: { name: string; url?: string; size?: n
       className="flex flex-shrink-0 items-center justify-center rounded-full font-medium"
       style={{
         width: size, height: size,
-        background: "rgba(0,212,106,0.1)",
+        background: "rgba(37, 99, 235,0.1)",
         color: uniq.green,
         fontSize: size * 0.32,
       }}

@@ -119,7 +119,7 @@ export function AudioInput({
     return (
       <div
         className="rounded-xl p-4 flex flex-col gap-3"
-        style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.30)" }}
+        style={{ background: "rgba(37, 99, 235,0.04)", border: "1px solid rgba(37, 99, 235,0.30)" }}
       >
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" style={{ color: "var(--green)" }} />

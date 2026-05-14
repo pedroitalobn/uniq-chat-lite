@@ -399,8 +399,8 @@ export function ConversationList({
             style={
               isSelected
                 ? {
-                    background: "rgba(0,212,106,0.06)",
-                    borderLeft: "2px solid #00d46a",
+                    background: "rgba(37, 99, 235,0.06)",
+                    borderLeft: "2px solid #2563EB",
                     paddingLeft: isCompact ? 10 : 22,
                   }
                 : {
@@ -444,7 +444,7 @@ export function ConversationList({
                       onBlur={() => commitEdit(conv)}
                       onClick={e => e.preventDefault()}
                       className="min-w-0 flex-1 rounded px-1 py-0 text-sm outline-none"
-                      style={{ background: "var(--border-default)", border: "1px solid rgba(0,212,106,0.35)", color: "hsl(240 15% 95%)" }}
+                      style={{ background: "var(--border-default)", border: "1px solid rgba(37, 99, 235,0.35)", color: "hsl(240 15% 95%)" }}
                       autoFocus
                     />
                   ) : (
@@ -467,14 +467,14 @@ export function ConversationList({
                       className="flex-shrink-0 opacity-0 group-hover/name:opacity-100 transition-opacity ml-0.5"
                       title="Editar nome"
                     >
-                      <Pencil className="h-2.5 w-2.5" style={{ color: "#00d46a" }} />
+                      <Pencil className="h-2.5 w-2.5" style={{ color: "#2563EB" }} />
                     </button>
                   )}
                 </span>
                 <time
                   className="flex-shrink-0 text-[10px]"
                   style={{
-                    color: hasUnread ? "#00d46a" : "hsl(240 8% 44%)",
+                    color: hasUnread ? "#2563EB" : "hsl(240 8% 44%)",
                     fontWeight: hasUnread ? 600 : 400,
                   }}
                 >
@@ -510,9 +510,9 @@ export function ConversationList({
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
                     style={{
-                      background: "rgba(0,212,106,0.08)",
-                      color: "#00d46a",
-                      border: "1px solid rgba(0,212,106,0.18)",
+                      background: "rgba(37, 99, 235,0.08)",
+                      color: "#2563EB",
+                      border: "1px solid rgba(37, 99, 235,0.18)",
                     }}
                     title={instanceLabel(conv.instance_id)}
                   >
@@ -542,11 +542,11 @@ export function ConversationList({
                 className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors"
                 style={{
                   background: "transparent",
-                  color: "#00d46a",
-                  border: "1px solid rgba(0,212,106,0.3)",
+                  color: "#2563EB",
+                  border: "1px solid rgba(37, 99, 235,0.3)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(0,212,106,0.12)";
+                  e.currentTarget.style.background = "rgba(37, 99, 235,0.12)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
@@ -575,7 +575,7 @@ export function ConversationList({
               id: "read",
               label: "Lida",
               icon: CheckCheckIcon,
-              color: "#00d46a",
+              color: "#2563EB",
               textColor: "#0a0a14",
               onAction: () => onMarkRead(conv),
             }] : []}

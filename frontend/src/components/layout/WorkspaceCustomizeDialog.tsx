@@ -24,7 +24,7 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 const COLORS = [
-  "#00d46a", "#3b82f6", "#a78bfa", "#f472b6", "#fbbf24", "#10b981",
+  "#2563EB", "#3b82f6", "#a78bfa", "#f472b6", "#fbbf24", "#10b981",
   "#06b6d4", "#8b5cf6", "#ec4899", "#f97316", "#ef4444", "#64748b",
 ];
 

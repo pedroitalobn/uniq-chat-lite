@@ -21,7 +21,7 @@ const CRM_VARS: VarDef[] = [
   { token: "{{contact.last_name}}",   label: "Sobrenome",       example: "Silva" },
   { token: "{{contact.email}}",       label: "Email",           example: "joao@empresa.com" },
   { token: "{{contact.phone}}",       label: "Telefone",        example: "+55 11 98888-7777" },
-  { token: "{{contact.company}}",     label: "Empresa",         example: "Uniq" },
+  { token: "{{contact.company}}",     label: "Empresa",         example: "Qchat" },
   { token: "{{contact.job_title}}",   label: "Cargo",           example: "Diretor de Vendas" },
   { token: "{{contact.city}}",        label: "Cidade",          example: "São Paulo" },
   { token: "{{contact.state}}",       label: "Estado",          example: "SP" },

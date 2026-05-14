@@ -27,17 +27,17 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Uniq.chat — WhatsApp API Platform",
+  title: "Qchat — WhatsApp API Platform",
   description: "Gerencie instâncias WhatsApp com facilidade e escala.",
   // Hints pra o navegador tratar como app instalável (PWA-lite). Ícone
   // virá do /icon.png. Sem service worker offline ainda — só o "look".
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Uniq.chat",
+    title: "Qchat",
     statusBarStyle: "black-translucent",
   },
-  applicationName: "Uniq.chat",
+  applicationName: "Qchat",
   formatDetection: { telephone: false },
   // Ícones — apple-touch-icon vira splash no iOS quando instalado como PWA.
   // Sem assets dedicados de splash, o iOS usa esse ícone + theme_color do

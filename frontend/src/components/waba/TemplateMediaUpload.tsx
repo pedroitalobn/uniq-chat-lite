@@ -103,9 +103,9 @@ export function TemplateMediaUpload({
         style={
           justUploaded
             ? {
-                background: "rgba(0,212,106,0.10)",
-                color: "#00d46a",
-                border: "1px solid rgba(0,212,106,0.25)",
+                background: "rgba(37, 99, 235,0.10)",
+                color: "#2563EB",
+                border: "1px solid rgba(37, 99, 235,0.25)",
               }
             : {
                 background: "rgba(96,165,250,0.10)",
@@ -113,7 +113,7 @@ export function TemplateMediaUpload({
                 border: "1px solid rgba(96,165,250,0.25)",
               }
         }
-        title="Subir arquivo do seu computador. A Uniq hospeda e devolve a URL pra Meta."
+        title="Subir arquivo do seu computador. A  Qchat hospeda e devolve a URL pra Meta."
       >
         {upload.isPending ? (
           <Loader2 className={`${iconSize} animate-spin`} />
@@ -149,9 +149,9 @@ export function TemplateMediaPreview({
     <div
       className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[10px]"
       style={{
-        background: "rgba(0,212,106,0.05)",
-        border: "1px solid rgba(0,212,106,0.20)",
-        color: "#00d46a",
+        background: "rgba(37, 99, 235,0.05)",
+        border: "1px solid rgba(37, 99, 235,0.20)",
+        color: "#2563EB",
       }}
     >
       {isImg ? (

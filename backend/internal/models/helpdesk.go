@@ -98,7 +98,7 @@ type HelpDeskConfig struct {
 	Title             string     `gorm:"type:varchar(120);default:'Central de Ajuda'" json:"title"`
 	Description       string     `gorm:"type:varchar(500)" json:"description"`
 	CustomSlug        string     `gorm:"type:varchar(120);uniqueIndex" json:"custom_slug,omitempty"`
-	PrimaryColor      string     `gorm:"type:varchar(20);default:'#00d46a'" json:"primary_color"`
+	PrimaryColor      string     `gorm:"type:varchar(20);default:'#2563EB'" json:"primary_color"`
 	LogoURL           string     `gorm:"type:varchar(500)" json:"logo_url"`
 	WebchatInstanceID *uuid.UUID `gorm:"type:uuid" json:"webchat_instance_id,omitempty"`
 	WidgetEnabled     bool       `gorm:"default:true" json:"widget_enabled"`
@@ -110,7 +110,7 @@ type HelpDeskConfig struct {
 	CustomDomain string `gorm:"type:varchar(255)" json:"custom_domain,omitempty"`
 	// LayoutStyle: "default" | "glass" | "mintlify"
 	LayoutStyle string `gorm:"type:varchar(20);default:'glass'" json:"layout_style"`
-	// HideUniqBranding: esconde "Powered by Uniq Chat" no footer
+	// HideUniqBranding: esconde "Powered by Qchat" no footer
 	HideUniqBranding bool `gorm:"default:false" json:"hide_uniq_branding"`
 
 	// ── Access control ──────────────────────────────────────────────────
@@ -127,7 +127,7 @@ func (h *HelpDeskConfig) BeforeCreate(tx *gorm.DB) error {
 		h.ID = uuid.New()
 	}
 	if h.PrimaryColor == "" {
-		h.PrimaryColor = "#00d46a"
+		h.PrimaryColor = "#2563EB"
 	}
 	if h.Title == "" {
 		h.Title = "Central de Ajuda"

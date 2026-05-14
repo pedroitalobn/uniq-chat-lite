@@ -14,7 +14,7 @@ import { showConfirm } from "@/lib/confirm";
 const STATUS_FILTERS: { id: "all" | CrmMeeting["status"]; label: string; color: string }[] = [
   { id: "all",       label: "Todas",       color: "var(--text-3)" },
   { id: "scheduled", label: "Agendadas",   color: "#60a5fa" },
-  { id: "completed", label: "Realizadas",  color: "#00d46a" },
+  { id: "completed", label: "Realizadas",  color: "#2563EB" },
   { id: "cancelled", label: "Canceladas",  color: "var(--text-3)" },
   { id: "no_show",   label: "No-show",     color: "#fbbf24" },
 ];
@@ -129,7 +129,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </p>
       <button onClick={onCreate}
         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-        style={{ background: "#00d46a", color: "#03170a" }}>
+        style={{ background: "#2563EB", color: "#03170a" }}>
         <Plus className="w-4 h-4" /> Agendar primeira reunião
       </button>
     </div>
@@ -162,7 +162,7 @@ function MeetingRow({ meeting, onEdit, onDelete }: {
           )}
           {meeting.status === "completed" && (
             <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-              style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>Realizada</span>
+              style={{ background: "rgba(37, 99, 235,0.12)", color: "#2563EB" }}>Realizada</span>
           )}
           {meeting.status === "cancelled" && (
             <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
@@ -267,14 +267,14 @@ function MeetingModal({ workspaceId, meeting, onClose, onSaved }: {
           <div className="text-[11px] flex items-center gap-1.5 px-3 py-2 rounded-lg"
             style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.18)", color: "#60a5fa" }}>
             <Clock className="w-3 h-3" />
-            Sync com Google Calendar/Outlook em breve. Por agora a reunião fica registrada só no Uniq.
+            Sync com Google Calendar/Outlook em breve. Por agora a reunião fica registrada só no Qchat.
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ color: "var(--text-2)" }}>Cancelar</button>
           <button onClick={() => saveMut.mutate()} disabled={!form.title || !form.start_at || !form.end_at || saveMut.isPending}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-60"
-            style={{ background: "#00d46a", color: "#03170a" }}>
+            style={{ background: "#2563EB", color: "#03170a" }}>
             {saveMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? "Salvar" : "Criar reunião"}
           </button>

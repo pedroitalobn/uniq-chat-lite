@@ -1997,7 +1997,7 @@ func (m *Manager) executeCRMAction(actionType models.ActionType, contactPhone, c
 		// Find or create tag
 		var tag models.Tag
 		if err := m.db.Where("name = ?", tagName).First(&tag).Error; err != nil {
-			tag = models.Tag{Name: tagName, Color: "#00d46a"}
+			tag = models.Tag{Name: tagName, Color: "#2563EB"}
 			m.db.Create(&tag)
 		}
 		// Add tag to contact

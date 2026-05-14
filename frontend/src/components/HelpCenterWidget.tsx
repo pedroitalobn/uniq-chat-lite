@@ -17,7 +17,7 @@ function getApiBase(): string {
 }
 
 const WORKSPACE_SLUG = "uniqchat";
-const DEFAULT_COLOR = "#00d46a";
+const DEFAULT_COLOR = "#2563EB";
 
 export default function HelpCenterWidget() {
   const [api] = useState(() => getApiBase());
@@ -90,7 +90,7 @@ export default function HelpCenterWidget() {
             src={`/embed/widget/${token}`}
             style={{ width: "100%", height: "100%", border: "none" }}
             allow="microphone"
-            title="Suporte Uniq"
+            title="Suporte Qchat"
           />
         )}
       </div>

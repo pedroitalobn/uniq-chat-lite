@@ -1849,7 +1849,7 @@ func (h *AdminHandler) GetEmailSettings(c *fiber.Ctx) error {
 			"api_key":         "",
 			"api_key_preview": "",
 			"sender_email":    "mail@uniq.chat",
-			"sender_name":     "Uniq.chat",
+			"sender_name":     "Qchat",
 			"is_enabled":      true,
 			"has_api_key":     false,
 		})
@@ -1893,7 +1893,7 @@ func (h *AdminHandler) UpdateEmailSettings(c *fiber.Ctx) error {
 		req.SenderEmail = "mail@uniq.chat"
 	}
 	if req.SenderName == "" {
-		req.SenderName = "Uniq.chat"
+		req.SenderName = "Qchat"
 	}
 
 	var settings models.EmailSettings
@@ -2004,8 +2004,8 @@ func (h *AdminHandler) TestEmail(c *fiber.Ctx) error {
 	h.emailSvc.SetConfig(settings.APIKey, settings.SenderEmail, settings.SenderName)
 
 	// Send test email
-	htmlContent := email.TestHTML("Uniq.chat")
-	err := h.emailSvc.SyncSend(req.To, "Teste do Uniq.chat", htmlContent, "test")
+	htmlContent := email.TestHTML("Qchat")
+	err := h.emailSvc.SyncSend(req.To, "Teste do Qchat", htmlContent, "test")
 	if err != nil {
 		// Erro do Maileroo já vem com hint (HTTP 401/403/422 + razão).
 		// Loga internamente também pra sysadmin.
@@ -2148,7 +2148,7 @@ func (h *AdminHandler) TestEmailTemplate(c *fiber.Ctx) error {
 
 	// placeholder replacements for test payload
 	replacer := strings.NewReplacer(
-		"{{app_name}}", "Uniq.chat",
+		"{{app_name}}", "Qchat",
 		"{{name}}", "Usuário Teste",
 		"{{app_url}}", "https://uniq.chat",
 		"{{reset_link}}", "https://uniq.chat/reset-password?token=test",

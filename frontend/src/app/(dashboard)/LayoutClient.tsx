@@ -7,11 +7,11 @@ import { authApi, instancesApi } from "@/lib/api";
 import { UsageBanner } from "@/components/billing/UsageBanner";
 import { PendingInvitesBanner } from "@/components/layout/PendingInvitesBanner";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUniqAIPageContext, type IslandPageContext } from "@/components/uniq-ai/island-context";
+import { useQChatAIPageContext, type IslandPageContext } from "@/components/uniq-ai/island-context";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 
 // Detecta o escopo da página atual a partir do pathname — registra
-// automaticamente no contexto do Uniq AI sem precisar tocar cada página.
+// automaticamente no contexto do QChat AI sem precisar tocar cada página.
 function inferPageContext(pathname: string): IslandPageContext {
   if (pathname.startsWith("/inbox")) {
     const isConvo = /^\/inbox\/[^/]+$/.test(pathname);
@@ -29,7 +29,7 @@ function inferPageContext(pathname: string): IslandPageContext {
 // Componente interno — pode usar hooks depois do LayoutClient declarar os seus.
 function PageContextRegistrar({ pathname }: { pathname: string }) {
   const ctx = inferPageContext(pathname);
-  useUniqAIPageContext(ctx);
+  useQChatAIPageContext(ctx);
   return null;
 }
 

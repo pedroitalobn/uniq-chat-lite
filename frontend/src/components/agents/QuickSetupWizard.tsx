@@ -151,8 +151,8 @@ export function QuickSetupWizard({
               onClick={() => setQ({ ...q, role: r.value })}
               className="text-left rounded-xl px-3 py-2 text-sm transition"
               style={{
-                background: q.role === r.value ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-                border: `1px solid ${q.role === r.value ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+                background: q.role === r.value ? "rgba(37, 99, 235,0.08)" : "var(--surface-2)",
+                border: `1px solid ${q.role === r.value ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
                 color: q.role === r.value ? "var(--green)" : "var(--text-1)",
               }}
             >

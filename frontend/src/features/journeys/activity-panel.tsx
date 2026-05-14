@@ -26,7 +26,7 @@ export function ActivityPanel() {
 
   const getActivityIcon = (item: any) => {
     if (item.last_message_type === "inbound") return <MessageSquare className="w-4 h-4" style={{ color: "#60a5fa" }} />;
-    if (item.last_message_type === "outbound") return <Send className="w-4 h-4" style={{ color: "#00d46a" }} />;
+    if (item.last_message_type === "outbound") return <Send className="w-4 h-4" style={{ color: "#2563EB" }} />;
     if (item.last_message_type === "wait") return <Clock className="w-4 h-4" style={{ color: "#f59e0b" }} />;
     return <Zap className="w-4 h-4" style={{ color: "#8b5cf6" }} />;
   };
@@ -65,7 +65,7 @@ export function ActivityPanel() {
         <div className="flex-1" />
         {stats && (
           <div className="flex items-center gap-2 sm:gap-3 text-xs flex-wrap" style={{ color: "var(--text-3)" }}>
-            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: "rgba(0,212,106,0.1)" }}>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: "rgba(37, 99, 235,0.1)" }}>
               <Activity className="w-3 h-3" style={{ color: "var(--green)" }} />
               {stats.journeys.active_executions} ativa{stats.journeys.active_executions !== 1 ? "s" : ""}
             </span>
@@ -107,7 +107,7 @@ export function ActivityPanel() {
                 <div key={i} className="rounded-xl p-3 sm:p-4 transition-all hover:scale-[1.005]"
                   style={{
                     background: "var(--surface-3)",
-                    border: `1px solid ${isActive ? "rgba(0,212,106,0.18)" : "var(--surface-border)"}`,
+                    border: `1px solid ${isActive ? "rgba(37, 99, 235,0.18)" : "var(--surface-border)"}`,
                     borderLeft: `3px solid ${statusConfig.color}60`,
                   }}>
                   <div className="flex items-start gap-3">
@@ -134,7 +134,7 @@ export function ActivityPanel() {
                       </div>
 
                       <p className="text-sm mb-2 break-words"
-                        style={{ color: item.last_message_type === "outbound" ? "#00d46a" : "var(--text-2)" }}>
+                        style={{ color: item.last_message_type === "outbound" ? "#2563EB" : "var(--text-2)" }}>
                         {getActivityMessage(item)}
                       </p>
 

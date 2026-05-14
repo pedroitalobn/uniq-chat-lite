@@ -181,8 +181,8 @@ function FlowNode({ data, selected }: NodeProps) {
           <div style={{
             fontSize: 8, fontWeight: 700, letterSpacing: "0.06em",
             padding: "2px 6px", borderRadius: 6, flexShrink: 0,
-            background: "rgba(0,212,106,0.15)", color: "#00d46a",
-            border: "1px solid rgba(0,212,106,0.3)",
+            background: "rgba(37, 99, 235,0.15)", color: "#2563EB",
+            border: "1px solid rgba(37, 99, 235,0.3)",
           }}>
             START
           </div>
@@ -869,7 +869,7 @@ function ConfigPanel({
         <button
           onClick={onSetStart}
           className="flex-1 text-[10px] py-2 rounded-lg font-medium"
-          style={{ background: "rgba(0,212,106,0.15)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.3)" }}
+          style={{ background: "rgba(37, 99, 235,0.15)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.3)" }}
         >
           {step.is_start_step ? "✓ É início" : "Definir como início"}
         </button>
@@ -908,7 +908,7 @@ function JourneyNameEditor({ name, onSave }: { name: string; onSave: (n: string)
       autoFocus
       style={{
         fontSize: 13, fontWeight: 600, background: "transparent", border: "none",
-        borderBottom: "1px solid #00d46a", outline: "none",
+        borderBottom: "1px solid #2563EB", outline: "none",
         color: "rgba(255,255,255,0.9)", width: "100%", padding: "0 2px",
       }}
     />
@@ -1386,9 +1386,9 @@ function TriggerPanel({
           disabled={togglingStatus}
           className="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
           style={{
-            background: initial?.status === "active" ? "rgba(239,68,68,0.12)" : "rgba(0,212,106,0.12)",
+            background: initial?.status === "active" ? "rgba(239,68,68,0.12)" : "rgba(37, 99, 235,0.12)",
             color: initial?.status === "active" ? "#ef4444" : "var(--green)",
-            border: `1px solid ${initial?.status === "active" ? "rgba(239,68,68,0.3)" : "rgba(0,212,106,0.3)"}`,
+            border: `1px solid ${initial?.status === "active" ? "rgba(239,68,68,0.3)" : "rgba(37, 99, 235,0.3)"}`,
           }}
         >
           {togglingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : initial?.status === "active" ? <X className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
@@ -1752,7 +1752,7 @@ function BuilderCanvas() {
         {/* Save state indicator */}
         <div className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1"
           style={{
-            background: dirty ? "rgba(234,179,8,0.12)" : "rgba(0,212,106,0.12)",
+            background: dirty ? "rgba(234,179,8,0.12)" : "rgba(37, 99, 235,0.12)",
             color: dirty ? "#eab308" : "var(--green)",
           }}
           title={dirty ? "Alterações não salvas" : "Tudo salvo"}
@@ -1764,7 +1764,7 @@ function BuilderCanvas() {
         {/* Status badge with animated dot for active */}
         <div className="text-[10px] px-2 py-1 rounded-md flex items-center gap-1"
           style={{
-            background: journey?.status === "active" ? "rgba(0,212,106,0.15)" : "rgba(234,179,8,0.15)",
+            background: journey?.status === "active" ? "rgba(37, 99, 235,0.15)" : "rgba(234,179,8,0.15)",
             color: journey?.status === "active" ? "var(--green)" : "#eab308",
           }}>
           {journey?.status === "active" && (

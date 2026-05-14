@@ -8,7 +8,7 @@ import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsCo
 
 // Relatórios do inbox — métricas de atendimento (volume, SLA, CSAT, fila/agente).
 // Mesmo backend do antigo /reports/overview, agora dentro de /inbox?view=reports
-// no tema escuro da Uniq.chat (var(--surface-solid) + accent #00d46a).
+// no tema escuro da Qchat (var(--surface-solid) + accent #2563EB).
 
 interface Overview {
   counts: { created: number; resolved: number; closed: number; open_now: number; backlog: number };
@@ -170,7 +170,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                 sla.refetch();
               }}
               className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-xl transition-colors"
-              style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+              style={{ background: "rgba(37, 99, 235,0.1)", color: "#2563EB", border: "1px solid rgba(37, 99, 235,0.25)" }}
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Tentar novamente
@@ -208,7 +208,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                 Criados
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded" style={{ background: "#00d46a" }} />
+                <span className="inline-block h-2 w-2 rounded" style={{ background: "#2563EB" }} />
                 Resolvidos
               </span>
             </div>
@@ -235,7 +235,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                       className="flex-1 rounded-sm transition-all"
                       style={{
                         height: `${(d.resolved / maxSeries) * 100}%`,
-                        background: "rgba(0,212,106,0.7)",
+                        background: "rgba(37, 99, 235,0.7)",
                         minHeight: d.resolved > 0 ? 2 : 0,
                       }}
                       title={`${d.resolved} resolvidos`}
@@ -265,7 +265,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             {byQueue.data?.items?.map((q) => (
               <Row key={q.queue_id} left={q.name}>
                 <span style={{ color: "#60a5fa" }}>{q.created} criados</span>
-                <span style={{ color: "#00d46a" }}>{q.resolved} resolvidos</span>
+                <span style={{ color: "#2563EB" }}>{q.resolved} resolvidos</span>
                 <span style={{ color: "#fbbf24" }}>{q.backlog} backlog</span>
               </Row>
             ))}
@@ -280,7 +280,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             {byUser.data?.items?.slice(0, 20).map((u) => (
               <Row key={u.user_id} left={u.name || u.email}>
                 <span>{u.assigned} atribuídos</span>
-                <span style={{ color: "#00d46a" }}>{u.resolved} resolvidos</span>
+                <span style={{ color: "#2563EB" }}>{u.resolved} resolvidos</span>
                 <span style={{ color: "var(--text-3)" }}>{formatSec(u.avg_first_response_sec)} 1ª resp.</span>
               </Row>
             ))}
@@ -305,9 +305,9 @@ function ReportsHeader({
       <div className="flex items-center gap-3">
         <div
           className="flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
+          style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}
         >
-          <Inbox className="h-4 w-4" style={{ color: "#00d46a" }} />
+          <Inbox className="h-4 w-4" style={{ color: "#2563EB" }} />
         </div>
         <div>
           <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
@@ -328,8 +328,8 @@ function ReportsHeader({
             onClick={() => setRange(r)}
             className="rounded-lg px-3 py-1 transition-colors"
             style={{
-              background: range === r ? "rgba(0,212,106,0.12)" : "transparent",
-              color: range === r ? "#00d46a" : "var(--text-3)",
+              background: range === r ? "rgba(37, 99, 235,0.12)" : "transparent",
+              color: range === r ? "#2563EB" : "var(--text-3)",
             }}
           >
             {r === "7d" ? "7 dias" : r === "30d" ? "30 dias" : "90 dias"}
@@ -453,7 +453,7 @@ function KPI({
 }) {
   const color = {
     blue: "#60a5fa",
-    emerald: "#00d46a",
+    emerald: "#2563EB",
     amber: "#fbbf24",
     red: "#f87171",
     zinc: "var(--text-1)",

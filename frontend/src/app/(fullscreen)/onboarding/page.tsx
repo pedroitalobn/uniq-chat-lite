@@ -188,7 +188,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     const t = setTimeout(async () => {
       await delay(200);
-      addMessage("ai", "Olá! 👋 Sou a Uniq AI e vou configurar tudo para você em poucos minutos.");
+      addMessage("ai", "Olá! 👋 Sou a QChat AI e vou configurar tudo para você em poucos minutos.");
       await delay(900);
       addMessage("ai", "Para começar, qual é o nicho do seu negócio?");
     }, 600);
@@ -411,7 +411,7 @@ export default function OnboardingPage() {
     setDone(true);
     setStep(5);
     await delay(400);
-    addMessage("ai", `✅ Tudo pronto! **${businessName}** está configurado e os agentes estão ativos. Bem-vindo à Uniq! 🚀`);
+    addMessage("ai", `✅ Tudo pronto! **${businessName}** está configurado e os agentes estão ativos. Bem-vindo ao Qchat! 🚀`);
   }, [selectedNiche, selectedJourneys, addMessage, replaceMessage, instanceId, businessName]);
 
   const handleSkipJourneys = useCallback(async () => {
@@ -475,7 +475,7 @@ export default function OnboardingPage() {
             <Sparkles className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <span className="text-white/90 font-semibold text-sm tracking-tight">Uniq</span>
+            <span className="text-white/90 font-semibold text-sm tracking-tight">Qchat</span>
             <span className="ml-2 text-[10px] font-medium text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full tracking-wider uppercase">
               Configuração por IA
             </span>

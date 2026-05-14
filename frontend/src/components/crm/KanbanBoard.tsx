@@ -31,7 +31,7 @@ export interface KanbanBoardProps {
   isLoading?: boolean;
 }
 
-// KanbanBoard — column per stage, draggable deals. Keeps the Uniq.chat dark
+// KanbanBoard — column per stage, draggable deals. Keeps the Qchat dark
 // aesthetic (HSL panels, green accent). Stats in each column header show
 // count + value sum (Pipedrive-style).
 export function KanbanBoard({ stages, deals, stats, currency = "BRL", stageOf, onMove, isLoading }: KanbanBoardProps) {
@@ -86,7 +86,7 @@ export function KanbanBoard({ stages, deals, stats, currency = "BRL", stageOf, o
                     {...provided.droppableProps}
                     className="flex-1 space-y-2 overflow-y-auto px-2 pb-3 pt-1 transition-colors"
                     style={{
-                      background: snapshot.isDraggingOver ? "rgba(0,212,106,0.04)" : undefined,
+                      background: snapshot.isDraggingOver ? "rgba(37, 99, 235,0.04)" : undefined,
                       minHeight: 80,
                     }}
                   >

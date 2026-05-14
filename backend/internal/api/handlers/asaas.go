@@ -264,7 +264,7 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 		Value:             plan.Price,
 		Cycle:             "MONTHLY",
 		NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"), // 1 dia
-		Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+		Description:       "Assinatura " + plan.Name + " — Qchat",
 		ExternalReference: user.ID.String() + "|" + plan.ID.String(),
 	}
 	subBody, _ := json.Marshal(subReq)

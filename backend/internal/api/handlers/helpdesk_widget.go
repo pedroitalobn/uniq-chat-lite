@@ -58,7 +58,7 @@ func (h *HelpDeskHandler) ensureWidgetInstance(wsID uuid.UUID, userID uuid.UUID)
 		cfg = models.HelpDeskConfig{
 			WorkspaceID:   wsID,
 			Title:         ws.Name + " · Central de Ajuda",
-			PrimaryColor:  "#00d46a",
+			PrimaryColor:  "#2563EB",
 			WidgetEnabled: true,
 			CustomSlug:    ws.Slug,
 		}
@@ -99,7 +99,7 @@ func (h *HelpDeskHandler) ensureWidgetInstance(wsID uuid.UUID, userID uuid.UUID)
 		WorkspaceID:     wsID,
 		DisplayName:     ws.Name,
 		Greeting:        "Olá! Como posso ajudar?",
-		PrimaryColor:    "#00d46a",
+		PrimaryColor:    "#2563EB",
 		Position:        "bottom-right",
 		DestinationType: "inbox",
 		HelpDeskEnabled: true,
@@ -124,7 +124,7 @@ func widgetSnippet(token string) string {
 	if envURL := os.Getenv("APP_URL"); envURL != "" {
 		appURL = envURL
 	}
-	return fmt.Sprintf(`<!-- Uniq Chat Widget -->
+	return fmt.Sprintf(`<!-- Qchat Widget -->
 <script>
 (function(){
   var t="%s",u="%s/v1/public/webchat/";

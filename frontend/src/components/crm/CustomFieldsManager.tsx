@@ -43,8 +43,8 @@ export function CustomFieldsManager({ workspaceId }: { workspaceId?: string }) {
       <div
         className="rounded-xl px-4 py-3 flex items-start gap-2 text-xs"
         style={{
-          background: "rgba(0,212,106,0.06)",
-          border: "1px solid rgba(0,212,106,0.18)",
+          background: "rgba(37, 99, 235,0.06)",
+          border: "1px solid rgba(37, 99, 235,0.18)",
           color: "var(--text-2)",
         }}
       >
@@ -104,7 +104,7 @@ function EntitySection({
         <div className="flex items-center gap-3 min-w-0">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)" }}
+            style={{ background: "rgba(37, 99, 235,0.10)", border: "1px solid rgba(37, 99, 235,0.20)" }}
           >
             <Icon className="w-4 h-4" style={{ color: "var(--green)" }} />
           </div>

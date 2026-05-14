@@ -259,14 +259,14 @@ export default function PaymentSettingsPage() {
             ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
              (settings.active_provider === 'asaas' && settings.asaas_configured) ||
              (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
-            ? "rgba(0,212,106,0.08)"
+            ? "rgba(37, 99, 235,0.08)"
             : "rgba(251,191,36,0.08)",
           border: `1px solid ${
             settings?.active_provider &&
             ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
              (settings.active_provider === 'asaas' && settings.asaas_configured) ||
              (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
-            ? "rgba(0,212,106,0.2)"
+            ? "rgba(37, 99, 235,0.2)"
             : "rgba(251,191,36,0.2)"
           }`
         }}
@@ -279,7 +279,7 @@ export default function PaymentSettingsPage() {
                 ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
                  (settings.active_provider === 'asaas' && settings.asaas_configured) ||
                  (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
-                ? "rgba(0,212,106,0.15)"
+                ? "rgba(37, 99, 235,0.15)"
                 : "rgba(251,191,36,0.15)"
             }}
           >
@@ -314,7 +314,7 @@ export default function PaymentSettingsPage() {
               ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
                (settings.active_provider === 'asaas' && settings.asaas_configured) ||
                (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
-              ? "rgba(0,212,106,0.15)"
+              ? "rgba(37, 99, 235,0.15)"
               : "rgba(251,191,36,0.15)"
           }}>
             <span style={{
@@ -377,7 +377,7 @@ export default function PaymentSettingsPage() {
                 className="p-3 rounded-xl border-2 transition-all text-center relative"
                 style={{
                   borderColor: isSelected ? provider.color : isActive ? "var(--green)" : isConfigured ? "var(--border-default)" : "hsl(240 12% 10%)",
-                  background: isSelected ? `${provider.color}10` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
+                  background: isSelected ? `${provider.color}10` : isActive ? "rgba(37, 99, 235,0.06)" : "transparent",
                   opacity: provider.id === "hotmart" ? 0.5 : (isConfigured ? 1 : 0.6),
                 }}
                 disabled={provider.id === "hotmart"}
@@ -392,7 +392,7 @@ export default function PaymentSettingsPage() {
                   <div>
                     {isActive && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider"
-                        style={{ background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }}>
+                        style={{ background: "rgba(37, 99, 235,0.18)", color: "var(--green)", border: "1px solid rgba(37, 99, 235,0.35)" }}>
                         ATIVO
                       </span>
                     )}
@@ -445,7 +445,7 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
             <span className="text-xs px-2 py-1 rounded" style={{ 
-              background: settings?.stripe_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)", 
+              background: settings?.stripe_configured ? "rgba(37, 99, 235,0.15)" : "rgba(251,191,36,0.15)", 
               color: settings?.stripe_configured ? "var(--green)" : "#fbbf24" 
             }}>
               {settings?.stripe_configured ? "Configurado" : "Fallback .env"}
@@ -570,7 +570,7 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
             <span className="text-xs px-2 py-1 rounded" style={{ 
-              background: settings?.asaas_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)", 
+              background: settings?.asaas_configured ? "rgba(37, 99, 235,0.15)" : "rgba(251,191,36,0.15)", 
               color: settings?.asaas_configured ? "var(--green)" : "#fbbf24" 
             }}>
               {settings?.asaas_configured ? "Configurado" : "Não configurado"}
@@ -707,7 +707,7 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
             <span className="text-xs px-2 py-1 rounded" style={{
-              background: settings?.abacatepay_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)",
+              background: settings?.abacatepay_configured ? "rgba(37, 99, 235,0.15)" : "rgba(251,191,36,0.15)",
               color: settings?.abacatepay_configured ? "var(--green)" : "#fbbf24"
             }}>
               {settings?.abacatepay_configured ? "Configurado" : "Não configurado"}
@@ -793,7 +793,7 @@ export default function PaymentSettingsPage() {
                   />
                   <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
                     <span className="font-medium">Transparente</span>
-                    <p style={{ color: "hsl(240 8% 46%)" }}>PIX direto na aplicação (checkout Uniq)</p>
+                    <p style={{ color: "hsl(240 8% 46%)" }}>PIX direto na aplicação (checkout Qchat)</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer flex-1">
@@ -874,7 +874,7 @@ export default function PaymentSettingsPage() {
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Status da API:</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  settings.abacatepay_test_status === "ok" ? "bg-[rgba(0,212,106,0.15)] text-[var(--green)]" :
+                  settings.abacatepay_test_status === "ok" ? "bg-[rgba(37, 99, 235,0.15)] text-[var(--green)]" :
                   "bg-[rgba(239,68,68,0.15)] text-[#ef4444]"
                 }`}>
                   {settings.abacatepay_test_status === "ok" ? "✓ Conectado" : "✕ Falhou"}
@@ -908,7 +908,7 @@ export default function PaymentSettingsPage() {
             const enabled = form[key].includes(m.id);
             return (
               <label key={m.id} className="flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer"
-                style={{ background: enabled ? "rgba(0,212,106,0.06)" : "var(--input)", border: `1px solid ${enabled ? "rgba(0,212,106,0.2)" : "var(--border-default)"}` }}
+                style={{ background: enabled ? "rgba(37, 99, 235,0.06)" : "var(--input)", border: `1px solid ${enabled ? "rgba(37, 99, 235,0.2)" : "var(--border-default)"}` }}
               >
                 <input
                   type="checkbox"

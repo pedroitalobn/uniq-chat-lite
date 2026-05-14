@@ -10,7 +10,7 @@ interface GlowingBorderButtonProps extends ButtonHTMLAttributes<HTMLButtonElemen
 
 export function GlowingBorderButton({
   children,
-  glowColor = "#00d46a",
+  glowColor = "#2563EB",
   className = "",
   style,
   ...props

@@ -2369,7 +2369,7 @@ export const voicesApi = {
     api.post("/v1/voices/test", { voice_id, text }, { headers: wsHeaders(workspaceId), responseType: "arraybuffer" }),
 };
 
-// ─── Platform AI (Uniq AI) ────────────────────────────────────────────────────
+// ─── Platform AI (QChat AI) ────────────────────────────────────────────────────
 export interface PlatformAIConfig {
   id?: string;
   provider: string;
@@ -2397,9 +2397,9 @@ export const platformAIApi = {
   listPublic: () => api.get<PlatformAIConfig[]>("/v1/integrations/platform-ai"),
 };
 
-// PlatformVoice — espelha a API de PlatformAI mas pra TTS (Uniq Voice).
+// PlatformVoice — espelha a API de PlatformAI mas pra TTS (Qchat Voice).
 // Super admin gerencia providers globais (OpenAI TTS, ElevenLabs, etc.)
-// que viram a "Uniq Voice" pros workspaces que têm allow_voice no plano.
+// que viram a "Qchat Voice" pros workspaces que têm allow_voice no plano.
 export interface PlatformVoiceConfig {
   id?: string;
   provider: string;     // openai_tts | elevenlabs | qwen_tts | azure_tts
@@ -2558,7 +2558,7 @@ export const platformVoiceApi = {
 export const brandingApi = {
   get: () => api.get("/v1/branding"),
   getPublic: () => api.get("/v1/branding/public"),
-  update: (patch: Record<string, any>) => api.put("/v1/branding", patch),
+  update: (patch: Record<string, any>) => api.put("/v1/admin/branding", patch),
   upload: (kind: "logo_light" | "logo_dark" | "favicon" | "login_bg", file: File) => {
     const form = new FormData();
     form.append("kind", kind);

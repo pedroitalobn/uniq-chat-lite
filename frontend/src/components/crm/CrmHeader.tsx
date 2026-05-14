@@ -68,10 +68,10 @@ export function CrmHeaderButton({
   disabled?: boolean;
 }) {
   const accentStyle: React.CSSProperties = {
-    background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
-    border: "1px solid rgba(0,212,106,0.30)",
+    background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.08))",
+    border: "1px solid rgba(37, 99, 235,0.30)",
     color: "var(--green)",
-    boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
+    boxShadow: "0 4px 16px rgba(37, 99, 235,0.18), inset 0 1px 0 var(--border-strong)",
   };
   const activeStyle: React.CSSProperties = {
     background: "var(--border-default)",

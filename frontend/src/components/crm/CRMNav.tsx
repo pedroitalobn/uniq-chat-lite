@@ -60,9 +60,9 @@ export function CRMNav() {
               )}
               style={{
                 background: active
-                  ? "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.06))"
+                  ? "linear-gradient(135deg, rgba(37, 99, 235,0.18), rgba(37, 99, 235,0.06))"
                   : "transparent",
-                border: active ? "1px solid rgba(0,212,106,0.25)" : "1px solid transparent",
+                border: active ? "1px solid rgba(37, 99, 235,0.25)" : "1px solid transparent",
                 color: active ? "var(--green)" : "var(--text-2)",
               }}
             >
@@ -86,16 +86,16 @@ export function CRMNav() {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all relative"
                 style={{
                   background: active
-                    ? "linear-gradient(135deg, rgba(0,212,106,0.16), rgba(0,212,106,0.04))"
+                    ? "linear-gradient(135deg, rgba(37, 99, 235,0.16), rgba(37, 99, 235,0.04))"
                     : "transparent",
-                  border: active ? "1px solid rgba(0,212,106,0.22)" : "1px solid transparent",
+                  border: active ? "1px solid rgba(37, 99, 235,0.22)" : "1px solid transparent",
                 }}
               >
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: active ? "rgba(0,212,106,0.18)" : "var(--input)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
+                    background: active ? "rgba(37, 99, 235,0.18)" : "var(--input)",
+                    border: `1px solid ${active ? "rgba(37, 99, 235,0.25)" : "var(--border-subtle)"}`,
                   }}
                 >
                   <Icon className="w-3.5 h-3.5" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
@@ -129,16 +129,16 @@ export function CRMNav() {
                 className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
                 style={{
                   background: active
-                    ? "linear-gradient(135deg, rgba(0,212,106,0.16), rgba(0,212,106,0.04))"
+                    ? "linear-gradient(135deg, rgba(37, 99, 235,0.16), rgba(37, 99, 235,0.04))"
                     : "transparent",
-                  border: active ? "1px solid rgba(0,212,106,0.22)" : "1px solid transparent",
+                  border: active ? "1px solid rgba(37, 99, 235,0.22)" : "1px solid transparent",
                 }}
               >
                 <div
                   className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: active ? "rgba(0,212,106,0.18)" : "var(--input)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
+                    background: active ? "rgba(37, 99, 235,0.18)" : "var(--input)",
+                    border: `1px solid ${active ? "rgba(37, 99, 235,0.25)" : "var(--border-subtle)"}`,
                   }}
                 >
                   <Icon className="w-3 h-3" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />

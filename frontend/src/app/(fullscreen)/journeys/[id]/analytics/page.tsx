@@ -88,8 +88,8 @@ export default function JourneyAnalyticsPage() {
         <span
           className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.05))",
-            border: "1px solid rgba(0,212,106,0.30)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235,0.20), rgba(37, 99, 235,0.05))",
+            border: "1px solid rgba(37, 99, 235,0.30)",
             color: "var(--green)",
           }}
         >
@@ -123,7 +123,7 @@ function TotalsBlock({ totals }: { totals: any }) {
     { label: "Total",      icon: Users,        color: "#a5b4fc", value: totals.all },
     { label: "Ativas",     icon: PlayCircle,   color: "#fbbf24", value: totals.active },
     { label: "Aguardando", icon: Clock,        color: "#a78bfa", value: (totals.waiting || 0) + (totals.waiting_input || 0) },
-    { label: "Completas",  icon: CheckCircle2, color: "#00d46a", value: totals.completed },
+    { label: "Completas",  icon: CheckCircle2, color: "#2563EB", value: totals.completed },
     { label: "Falharam",   icon: XCircle,      color: "#ef4444", value: totals.failed },
   ];
   return (
@@ -255,7 +255,7 @@ function FunnelBlock({ funnel, totals }: { funnel: any[]; totals: any }) {
                   className="h-full transition-[width] duration-500"
                   style={{
                     width: `${widthPct}%`,
-                    background: "linear-gradient(90deg, var(--green) 0%, rgba(0,212,106,0.3) 100%)",
+                    background: "linear-gradient(90deg, var(--green) 0%, rgba(37, 99, 235,0.3) 100%)",
                   }}
                 />
               </div>
@@ -336,13 +336,13 @@ function HoldoutBlock({ holdout }: { holdout: any }) {
             className="rounded-lg p-3"
             style={{
               background: lift != null && lift > 0
-                ? "rgba(0,212,106,0.06)"
+                ? "rgba(37, 99, 235,0.06)"
                 : lift != null && lift < 0
                 ? "rgba(239,68,68,0.06)"
                 : "var(--surface-2)",
               border: `1px solid ${
                 lift != null && lift > 0
-                  ? "rgba(0,212,106,0.20)"
+                  ? "rgba(37, 99, 235,0.20)"
                   : lift != null && lift < 0
                   ? "rgba(239,68,68,0.20)"
                   : "var(--surface-border)"

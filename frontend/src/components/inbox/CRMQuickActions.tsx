@@ -122,7 +122,7 @@ function Button({ onClick, disabled, loading, children, variant = "primary" }: {
 }) {
   const base = "flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all disabled:opacity-50";
   const styles = variant === "primary"
-    ? { background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }
+    ? { background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.25)", color: "#2563EB" }
     : variant === "secondary"
     ? { background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-default)", color: "var(--text-2)" }
     : { background: "transparent", border: "1px solid transparent", color: "var(--text-3)" };
@@ -499,7 +499,7 @@ export default function CRMQuickActions({ contactId }: CRMQuickActionsProps) {
   const buttons = [
     { id: "deal" as const, label: "Negociação", icon: Briefcase, color: "#fbbf24" },
     { id: "contact" as const, label: "Contato", icon: UserCog, color: "#38bdf8" },
-    { id: "tags" as const, label: "Tags", icon: Tag, color: "#00d46a" },
+    { id: "tags" as const, label: "Tags", icon: Tag, color: "#2563EB" },
     { id: "tasks" as const, label: "Tarefa", icon: CheckSquare, color: "#f59e0b" },
     { id: "meetings" as const, label: "Reunião", icon: CalendarDays, color: "#a78bfa" },
   ];

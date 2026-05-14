@@ -221,8 +221,8 @@ export function ActionPlanPreview({
     <div
       className="rounded-xl p-3 my-2 border-l-2 space-y-2"
       style={{
-        background: "rgba(0,212,106,0.04)",
-        border: "1px solid rgba(0,212,106,0.15)",
+        background: "rgba(37, 99, 235,0.04)",
+        border: "1px solid rgba(37, 99, 235,0.15)",
         borderLeftColor: "var(--green)",
         borderLeftWidth: "2px",
       }}
@@ -259,7 +259,7 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
     return (
       <div className="flex items-center gap-3 overflow-x-auto pb-2">
         <div className="flex flex-col items-center gap-1.5 min-w-[100px] p-2.5 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-          <div className="p-1.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+          <div className="p-1.5 rounded-full" style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
             <Zap className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
           <span className="text-[9px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>Gatilho</span>
@@ -284,7 +284,7 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2">
       <div className="flex flex-col items-center gap-1.5 min-w-[90px] p-2 rounded-xl flex-shrink-0" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-        <div className="p-1.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+        <div className="p-1.5 rounded-full" style={{ background: "rgba(37, 99, 235,0.1)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
           <Zap className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
         </div>
         <span className="text-[8px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>Gatilho</span>
@@ -351,7 +351,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
           className="absolute rounded-full"
           style={{
             inset: "-30%",
-            background: "radial-gradient(circle, rgba(0,212,106,0.12) 0%, transparent 65%)",
+            background: "radial-gradient(circle, rgba(37, 99, 235,0.12) 0%, transparent 65%)",
             filter: "blur(24px)",
           }}
           animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
@@ -363,7 +363,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
           className="absolute rounded-full"
           style={{
             inset: "-5%",
-            background: "conic-gradient(from 0deg, transparent 0%, rgba(0,212,106,0.35) 25%, rgba(0,255,130,0.18) 50%, rgba(0,212,106,0.35) 75%, transparent 100%)",
+            background: "conic-gradient(from 0deg, transparent 0%, rgba(37, 99, 235,0.35) 25%, rgba(0,255,130,0.18) 50%, rgba(37, 99, 235,0.35) 75%, transparent 100%)",
             filter: "blur(16px)",
           }}
           animate={{ rotate: 360 }}
@@ -374,7 +374,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
         <motion.div
           className="absolute inset-[8%] rounded-full"
           style={{
-            background: "conic-gradient(from 180deg, rgba(0,255,120,0.3) 0%, transparent 40%, rgba(0,212,106,0.4) 70%, transparent 100%)",
+            background: "conic-gradient(from 180deg, rgba(0,255,120,0.3) 0%, transparent 40%, rgba(37, 99, 235,0.4) 70%, transparent 100%)",
             filter: "blur(10px)",
           }}
           animate={{ rotate: -360 }}
@@ -385,7 +385,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
         <motion.div
           className="absolute inset-[20%] rounded-full"
           style={{
-            background: "radial-gradient(circle, rgba(0,212,106,0.75) 0%, rgba(0,212,106,0.3) 50%, transparent 75%)",
+            background: "radial-gradient(circle, rgba(37, 99, 235,0.75) 0%, rgba(37, 99, 235,0.3) 50%, transparent 75%)",
             filter: "blur(8px)",
           }}
           animate={{ scale: [1, 1.25, 1], opacity: [0.7, 1, 0.7] }}
@@ -394,11 +394,11 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
 
         {/* Partículas orbitando — 6 em raios e velocidades distintas */}
         {[
-          { size: 5,   radius: 80,  duration: 7,   delay: 0,    color: "rgba(0,212,106,1)",   glow: "rgba(0,212,106,0.9)" },
+          { size: 5,   radius: 80,  duration: 7,   delay: 0,    color: "rgba(37, 99, 235,1)",   glow: "rgba(37, 99, 235,0.9)" },
           { size: 3.5, radius: 95,  duration: 11,  delay: -3,   color: "rgba(0,255,120,0.85)", glow: "rgba(0,255,120,0.7)", reverse: true },
-          { size: 4,   radius: 68,  duration: 8.5, delay: -5,   color: "rgba(0,212,106,0.9)",  glow: "rgba(0,212,106,0.8)" },
+          { size: 4,   radius: 68,  duration: 8.5, delay: -5,   color: "rgba(37, 99, 235,0.9)",  glow: "rgba(37, 99, 235,0.8)" },
           { size: 2.5, radius: 108, duration: 14,  delay: -7,   color: "rgba(160,255,200,0.7)", glow: "rgba(160,255,200,0.6)", reverse: true },
-          { size: 3,   radius: 58,  duration: 6,   delay: -1.5, color: "rgba(0,212,106,0.8)",  glow: "rgba(0,212,106,0.7)" },
+          { size: 3,   radius: 58,  duration: 6,   delay: -1.5, color: "rgba(37, 99, 235,0.8)",  glow: "rgba(37, 99, 235,0.7)" },
           { size: 2,   radius: 120, duration: 18,  delay: -9,   color: "rgba(0,255,140,0.5)",  glow: "rgba(0,255,140,0.4)" },
         ].map((p, i) => (
           <motion.div
@@ -427,9 +427,9 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
         <motion.div
           className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.08) 100%)",
-            border: "1px solid rgba(0,212,106,0.5)",
-            boxShadow: "0 0 40px rgba(0,212,106,0.5), 0 0 80px rgba(0,212,106,0.2), inset 0 1px 0 var(--border-strong)",
+            background: "linear-gradient(135deg, rgba(37, 99, 235,0.25) 0%, rgba(37, 99, 235,0.08) 100%)",
+            border: "1px solid rgba(37, 99, 235,0.5)",
+            boxShadow: "0 0 40px rgba(37, 99, 235,0.5), 0 0 80px rgba(37, 99, 235,0.2), inset 0 1px 0 var(--border-strong)",
             backdropFilter: "blur(12px)",
           }}
           animate={{ scale: [1, 1.05, 1] }}
@@ -447,7 +447,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
             transition={{ rotate: { duration: 5, repeat: Infinity }, scale: { duration: 2.8, repeat: Infinity } }}
           >
             <SparklesIcon
-              className="w-10 h-10 sm:w-12 sm:h-12 drop-shadow-[0_0_12px_rgba(0,212,106,1)]"
+              className="w-10 h-10 sm:w-12 sm:h-12 drop-shadow-[0_0_12px_rgba(37, 99, 235,1)]"
               style={{ color: "var(--green)" }}
             />
           </motion.div>
@@ -455,7 +455,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
       </motion.div>
 
       <h2 className="text-xl sm:text-2xl font-semibold mb-2 text-center tracking-tight" style={{ color: "var(--text-1)" }}>
-        Olá, sou o <span style={{ color: "var(--green)" }}>Uniq AI</span>
+        Olá, sou o <span style={{ color: "var(--green)" }}>QChat AI</span>
       </h2>
       <p className="text-sm text-center mb-8 sm:mb-10 max-w-md leading-relaxed" style={{ color: "var(--text-3)" }}>
         Crie jornadas, gerencie instâncias e dispare campanhas — tudo via linguagem natural.
@@ -481,10 +481,10 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
             whileTap={{ scale: 0.97 }}
           >
             <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300"
-              style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.06) 0%, transparent 60%)" }} />
+              style={{ background: "linear-gradient(135deg, rgba(37, 99, 235,0.06) 0%, transparent 60%)" }} />
             <div className="relative z-10">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
-                style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.2)" }}>
                 <item.icon className="w-4 h-4" style={{ color: "var(--green)" }} />
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: "var(--text-1)" }}>{item.label}</p>
@@ -532,7 +532,7 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
 
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
-          {isUser ? "Você" : "Uniq AI"}
+          {isUser ? "Você" : "QChat AI"}
         </p>
         <div className="text-sm leading-relaxed break-words" style={{ color: "var(--text-1)" }}>
           {isUser ? (
@@ -631,8 +631,8 @@ export function PromptInput({
       <motion.div
         className="flex items-end gap-2 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
         style={{
-          background: isLoading ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
-          border: `1px solid ${isLoading ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+          background: isLoading ? "rgba(37, 99, 235,0.08)" : "var(--surface-3)",
+          border: `1px solid ${isLoading ? "rgba(37, 99, 235,0.3)" : "var(--surface-border)"}`,
           transition: "all 0.2s ease",
         }}
       >

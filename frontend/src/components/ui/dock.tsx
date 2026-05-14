@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // A single icon button for use inside a dock. Shows tooltip to the right.
 // badge: number or string shown as a pill.
 // pulse: shows a glowing dot indicator.
-// active: highlights with the Uniq green.
+// active: highlights with the  Qchat green.
 
 interface DockIconProps {
   icon: React.ElementType;
@@ -42,16 +42,16 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
           justifyContent: "center",
           flexShrink: 0,
           border: active
-            ? "1px solid rgba(0,212,106,0.35)"
+            ? "1px solid rgba(37, 99, 235,0.35)"
             : "1px solid var(--border-default)",
           background: active
-            ? "linear-gradient(135deg, rgba(0,212,106,0.22), rgba(0,212,106,0.08))"
+            ? "linear-gradient(135deg, rgba(37, 99, 235,0.22), rgba(37, 99, 235,0.08))"
             : hovered
             ? "var(--border-default)"
             : "var(--input)",
-          color: active ? "#00d46a" : danger ? "#f87171" : "rgba(255,255,255,0.65)",
+          color: active ? "#2563EB" : danger ? "#f87171" : "rgba(255,255,255,0.65)",
           boxShadow: active
-            ? "0 0 16px rgba(0,212,106,0.25), inset 0 1px 0 var(--border-default)"
+            ? "0 0 16px rgba(37, 99, 235,0.25), inset 0 1px 0 var(--border-default)"
             : hovered && !danger
             ? "0 4px 16px rgba(0,0,0,0.3)"
             : "none",
@@ -72,8 +72,8 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "#00d46a",
-            boxShadow: "0 0 6px #00d46a",
+            background: "#2563EB",
+            boxShadow: "0 0 6px #2563EB",
             animation: "dockPulse 2s ease-in-out infinite",
           }} />
         )}
@@ -87,7 +87,7 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
             minWidth: 16,
             height: 16,
             borderRadius: 99,
-            background: "#00d46a",
+            background: "#2563EB",
             color: "#03170a",
             fontSize: 9,
             fontWeight: 700,
@@ -95,7 +95,7 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
             alignItems: "center",
             justifyContent: "center",
             padding: "0 3px",
-            boxShadow: "0 0 6px rgba(0,212,106,0.5)",
+            boxShadow: "0 0 6px rgba(37, 99, 235,0.5)",
           }}>
             {typeof badge === "number" && badge > 99 ? "99+" : badge}
           </span>

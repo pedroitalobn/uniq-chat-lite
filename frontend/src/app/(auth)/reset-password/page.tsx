@@ -54,9 +54,9 @@ function ResetPasswordForm() {
       <div className="p-7 flex flex-col items-center text-center space-y-3">
         <div
           className="h-14 w-14 rounded-2xl flex items-center justify-center"
-          style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.3)" }}
+          style={{ background: "rgba(37, 99, 235,0.12)", border: "1px solid rgba(37, 99, 235,0.3)" }}
         >
-          <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
+          <Check className="h-7 w-7" style={{ color: "#2563EB" }} />
         </div>
         <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
           Senha redefinida
@@ -67,7 +67,7 @@ function ResetPasswordForm() {
         <button
           onClick={() => router.push("/login")}
           className="mt-2 flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-xl transition-colors"
-          style={{ background: "#00d46a", color: "#0a0a0f" }}
+          style={{ background: "#2563EB", color: "#0a0a0f" }}
         >
           Ir para o login
           <ArrowRight className="h-4 w-4" />
@@ -153,7 +153,7 @@ function ResetPasswordForm() {
           type="submit"
           disabled={loading || !password || !confirm}
           className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: "#00d46a", color: "#0a0a0f" }}
+          style={{ background: "#2563EB", color: "#0a0a0f" }}
         >
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -229,7 +229,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--surface-solid)" }}>
       <div
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at bottom, rgba(0,212,106,0.05) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse at bottom, rgba(37, 99, 235,0.05) 0%, transparent 70%)" }}
       />
 
       <div className="w-full max-w-sm relative animate-fade-in-up">
@@ -258,7 +258,7 @@ export default function ResetPasswordPage() {
           <Suspense
             fallback={
               <div className="p-8 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#00d46a" }} />
+                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#2563EB" }} />
               </div>
             }
           >
