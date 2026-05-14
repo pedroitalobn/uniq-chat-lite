@@ -1836,6 +1836,19 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				},
 			}
 			auth, raw, err := h.asaasH.CreatePixAutomaticAuthorization(authReq)
+			// Asaas devolve "Já existe uma autorização para o contrato
+			// informado" quando o user clica novamente sem ter pago a
+			// autorização anterior. Geramos contractId fresco com sufixo
+			// timestamp e tentamos uma vez mais.
+			if (err != nil || auth == nil || auth.ID == "") &&
+				strings.Contains(string(raw), "Já existe uma autorização") {
+				freshSuffix := fmt.Sprintf("-%d", time.Now().Unix())
+				if len(authReq.ContractID)+len(freshSuffix) > 35 {
+					authReq.ContractID = authReq.ContractID[:35-len(freshSuffix)]
+				}
+				authReq.ContractID += freshSuffix
+				auth, raw, err = h.asaasH.CreatePixAutomaticAuthorization(authReq)
+			}
 			if err != nil || auth == nil || auth.ID == "" {
 				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 					"error":  "asaas_pix_automatic_failed",
