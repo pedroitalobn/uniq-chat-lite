@@ -1,5 +1,18 @@
 import type { NextConfig } from "next";
 
+// White-label: lê o host do FRONTEND_URL e adiciona à lista de origins
+// permitidos para Server Actions. Sem isso o NextAuth atrás de Traefik
+// pode entrar em loop de redirect ao não reconhecer o domínio.
+function hostOf(url: string | undefined): string | null {
+  if (!url) return null;
+  try { return new URL(url).host; } catch { return null; }
+}
+const wlHosts = [
+  hostOf(process.env.FRONTEND_URL),
+  hostOf(process.env.APP_URL),
+  hostOf(process.env.NEXTAUTH_URL),
+].filter((h): h is string => !!h);
+
 const nextConfig: NextConfig = {
   compress: false,
   experimental: {
@@ -11,6 +24,7 @@ const nextConfig: NextConfig = {
         "uniq.chat",
         "www.uniq.chat",
         "api.uniq.chat",
+        ...wlHosts,
       ],
     },
   },
