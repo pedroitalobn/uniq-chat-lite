@@ -709,38 +709,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }, [timeline]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_440px] h-full min-h-0">
-      {/* Contact Intelligence Dashboard */}
-      <div className="hidden lg:flex flex-col overflow-hidden">
-        <ContactIntelligenceDashboard
-          conversation={convQ.data}
-          presence={presence}
-          canAssign={canAssign}
-          canClose={canClose}
-          canReopen={canReopen}
-          canSnooze={canSnooze}
-          canUpdate={canUpdate}
-          onClaim={() => claim.mutate()}
-          onUnassign={() => unassign.mutate()}
-          onResolve={() => resolve.mutate()}
-          onClose={() => close.mutate()}
-          onReopen={() => reopen.mutate()}
-          onSnooze={openSnoozePrompt}
-          onPin={() => patchConv.mutate({ is_pinned: !convQ.data?.is_pinned })}
-          onMute={() => patchConv.mutate({ is_muted: !convQ.data?.is_muted })}
-          onAvatarClick={(url, name) => setViewerSource({ type: "image", url, filename: `${name}.jpg` })}
-          convMode={convMode}
-          onModeChange={(mode) => {
-            setConvMode(mode);
-            const dbMode = mode === "ai" ? "active" : mode === "observing" ? "observing" : "disabled";
-            agentStateMut.mutate(dbMode);
-            bot.mutate(mode === "ai");
-          }}
-        />
-      </div>
-
+    <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] h-full min-h-0">
       {/* Chat Panel */}
-      <section className="flex flex-col overflow-hidden border-l" style={{ borderColor: "var(--border-subtle)" }}>
+      <section className="flex flex-col overflow-hidden lg:border-r" style={{ borderColor: "var(--border-subtle)" }}>
         <header className="flex items-center gap-2 px-2 sm:px-4 py-2 border-b flex-shrink-0"
           style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
           {/* Back button */}
@@ -904,6 +875,35 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           onClearReply={() => setReplyTo(null)}
         />
       </section>
+
+      {/* Contact Intelligence Dashboard */}
+      <div className="hidden lg:flex flex-col overflow-hidden">
+        <ContactIntelligenceDashboard
+          conversation={convQ.data}
+          presence={presence}
+          canAssign={canAssign}
+          canClose={canClose}
+          canReopen={canReopen}
+          canSnooze={canSnooze}
+          canUpdate={canUpdate}
+          onClaim={() => claim.mutate()}
+          onUnassign={() => unassign.mutate()}
+          onResolve={() => resolve.mutate()}
+          onClose={() => close.mutate()}
+          onReopen={() => reopen.mutate()}
+          onSnooze={openSnoozePrompt}
+          onPin={() => patchConv.mutate({ is_pinned: !convQ.data?.is_pinned })}
+          onMute={() => patchConv.mutate({ is_muted: !convQ.data?.is_muted })}
+          onAvatarClick={(url, name) => setViewerSource({ type: "image", url, filename: `${name}.jpg` })}
+          convMode={convMode}
+          onModeChange={(mode) => {
+            setConvMode(mode);
+            const dbMode = mode === "ai" ? "active" : mode === "observing" ? "observing" : "disabled";
+            agentStateMut.mutate(dbMode);
+            bot.mutate(mode === "ai");
+          }}
+        />
+      </div>
 
       {transferOpen && wsId && (
         <TransferDialog
