@@ -137,7 +137,7 @@ export function emptyForm(): AgentForm {
     response_pace: "natural",
     response_length: "balanced",
     audio_reply_mode: "text",
-    message_batching: "off",
+    message_batching: "smart",
     pace_settings: "{}",
     access_restricted: false,
     editor_role_ids: [],
@@ -230,7 +230,7 @@ export function mapAgent(data: any): AgentForm {
       : "text",
     message_batching: ["off", "smart", "patient"].includes(data?.message_batching)
       ? data.message_batching
-      : "off",
+      : "smart",
     pace_settings: typeof data?.pace_settings === "string" ? data.pace_settings : "{}",
     access_restricted: !!data?.access_restricted,
     editor_role_ids: parseJSONArray<string[]>(data?.editor_role_ids, []),

@@ -265,6 +265,15 @@ func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fr
 	recordLLMUsage(ctx, r.db, instUUID, integration, llmResult, userPrompt+systemPrompt, reply)
 
 	reply = sanitizeAssistantReply(reply)
+	// Dedup contra a última resposta do agente nessa conversa. Mesmo com
+	// as instruções de "não repita verbatim" no system prompt, LLMs
+	// (especialmente os menores) reciclam closers tipo "Se precisar de
+	// mais detalhes, posso checar com a equipe" turno após turno.
+	// Removemos sentenças que aparecem idênticas (modulo casing/pontuação)
+	// na resposta imediatamente anterior do agente.
+	if prev := r.lastAgentReply(instUUID, fromJID); prev != "" {
+		reply = dedupAgainstPrevious(reply, prev)
+	}
 	if reply == "" {
 		r.logExecution(models.AgentExecution{
 			AgentID: agent.ID, InstanceID: instUUID,
@@ -1174,10 +1183,25 @@ func logContent(raw string) string {
 }
 
 // botFooterRe — pergunta-rodapé corporativa que vira "tell" de bot.
-// Roda em final de balão (separado por dupla newline). Casa variações
-// como "Gostaria de saber mais sobre esse serviço?", "Posso ajudar com
-// mais alguma coisa?", "Tem mais alguma dúvida?".
-var botFooterRe = regexp.MustCompile(`(?im)^\s*(gostaria de saber mais.*\?|posso (te )?ajudar (com|em) mais.*\?|tem (mais )?alguma (outra )?d[uú]vida.*\?|fico (à|a) disposi[cç][ãa]o.*[.!?]?|estou (à|a) disposi[cç][ãa]o.*[.!?]?|qualquer d[uú]vida.*[.!?]?)\s*$`)
+// Roda no FINAL de balão (separado por dupla newline). Cada caso vem
+// do que observamos chats reais dispararem repetidamente, indicando
+// "bot": rodapés genéricos, propostas vagas de checar com terceiros,
+// "se precisar de mais detalhes…", etc. Quando alguma dessas frases
+// vier no fim de um balão, ela é descartada antes do envio.
+var botFooterRe = regexp.MustCompile(`(?im)^\s*(` +
+	`gostaria de saber mais.*\??|` +
+	`posso (te )?ajudar (com|em) (mais|outra).*\??|` +
+	`tem (mais )?alguma (outra )?d[uú]vida.*\??|` +
+	`fico (à|a) disposi[cç][ãa]o.*[.!?]?|` +
+	`estou (à|a) disposi[cç][ãa]o.*[.!?]?|` +
+	`qualquer d[uú]vida.*[.!?]?|` +
+	`(se|caso) (voc[eê] )?precisar de (mais )?(detalhes|informa[cç][õo]es?).*[.!?]?|` +
+	`(se|caso) (voc[eê] )?(quiser|precisar).*posso (checar|consultar|verificar).*com (a |o )?(equipe|time|suporte).*[.!?]?|` +
+	`(posso|vou) (checar|consultar|verificar).*com (a |o )?(equipe|time|suporte).*[.!?]?|` +
+	`estamos (aqui|prontos) (pra|para) (te )?ajudar.*[.!?]?|` +
+	`estou (aqui|pronto) (pra|para) (te )?ajudar.*[.!?]?|` +
+	`conte comigo.*[.!?]?` +
+	`)\s*$`)
 
 // listMarkerRe — bullets e numeração no início de linha. Se o LLM
 // insistiu em formatar uma lista, removemos os marcadores e deixamos
@@ -1187,6 +1211,94 @@ var listMarkerRe = regexp.MustCompile(`(?m)^\s*(?:[-*•]\s+|\d+[.)]\s+)`)
 // markdownEmphasisRe — **negrito**, __sublinhado__, _itálico_. WhatsApp
 // usa * e _ próprios mas o LLM colando ** vira poluição visual.
 var markdownEmphasisRe = regexp.MustCompile(`(\*\*|__)(.+?)(\*\*|__)`)
+
+// dedupAgainstPrevious — recebe a nova resposta + a última do agente
+// e tira sentenças do novo reply que sejam basicamente idênticas a
+// alguma sentença do reply anterior. "Basicamente idênticas" =
+// lowercase, sem pontuação, sem espaços extras. Cobre o caso clássico
+// do LLM fechar com "Se precisar de mais detalhes, posso checar com
+// a equipe." em DOIS turnos seguidos.
+//
+// Se restar reply vazia, devolve string vazia — o caller decide
+// (loga como failed). Se restar algo, devolve sem as repetidas.
+func dedupAgainstPrevious(reply, previous string) string {
+	prevNorm := make(map[string]bool)
+	for _, s := range splitSentences(previous) {
+		key := normalizeForDedup(s)
+		if len(key) >= 12 { // ignora "ok", "sim" etc.
+			prevNorm[key] = true
+		}
+	}
+	if len(prevNorm) == 0 {
+		return reply
+	}
+	bubbles := strings.Split(reply, "\n\n")
+	out := bubbles[:0]
+	for _, bubble := range bubbles {
+		kept := make([]string, 0)
+		for _, sent := range splitSentences(bubble) {
+			if prevNorm[normalizeForDedup(sent)] {
+				continue
+			}
+			kept = append(kept, sent)
+		}
+		joined := strings.TrimSpace(strings.Join(kept, " "))
+		if joined != "" {
+			out = append(out, joined)
+		}
+	}
+	return strings.TrimSpace(strings.Join(out, "\n\n"))
+}
+
+// splitSentences — quebra texto em sentenças básicas. Não vale a pena
+// trazer biblioteca de NLP pra isso; um split por terminação simples
+// resolve 95% dos casos do agente.
+func splitSentences(text string) []string {
+	if strings.TrimSpace(text) == "" {
+		return nil
+	}
+	out := make([]string, 0, 4)
+	var b strings.Builder
+	for _, r := range text {
+		b.WriteRune(r)
+		if r == '.' || r == '!' || r == '?' || r == '\n' {
+			s := strings.TrimSpace(b.String())
+			if s != "" {
+				out = append(out, s)
+			}
+			b.Reset()
+		}
+	}
+	rest := strings.TrimSpace(b.String())
+	if rest != "" {
+		out = append(out, rest)
+	}
+	return out
+}
+
+// normalizeForDedup — chave de comparação. Lowercase, sem pontuação,
+// sem espaços duplicados.
+func normalizeForDedup(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	prevSpace := false
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevSpace = false
+		case r >= 192 && r <= 255: // latin-1 acentuado
+			b.WriteRune(r)
+			prevSpace = false
+		case r == ' ' || r == '\t' || r == '\n':
+			if !prevSpace && b.Len() > 0 {
+				b.WriteByte(' ')
+				prevSpace = true
+			}
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
 
 func sanitizeAssistantReply(reply string) string {
 	reply = strings.TrimSpace(reply)
