@@ -26,6 +26,7 @@ import {
 import { useUniqAIIsland } from "@/components/uniq-ai/island-context";
 import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { haptic } from "@/lib/haptics";
+import { features } from "@/lib/feature-flags";
 
 type NavEntry = {
   href?: string;
@@ -50,12 +51,12 @@ const MORE: NavEntry[] = [
   { href: "/campaigns",    label: "Campanhas",   icon: Megaphone },
   { href: "/journeys",     label: "Jornadas",    icon: Wand2 },
   { href: "/agents",       label: "Agentes",     icon: Bot },
-  { href: "/help-desk",    label: "Help Desk",   icon: LifeBuoy },
-  { href: "/shops",        label: "Lojas",       icon: ShoppingBag },
+  ...(features.helpdesk ? [{ href: "/help-desk", label: "Help Desk", icon: LifeBuoy }] : []),
+  ...(features.shops ? [{ href: "/shops", label: "Lojas", icon: ShoppingBag }] : []),
   { href: "/instances",    label: "Instâncias",  icon: Smartphone },
   { href: "/servers",      label: "Servidores",  icon: Server },
   { href: "/integrations", label: "Integrações", icon: Plug },
-  { href: "/usage",        label: "Consumo",     icon: Zap },
+  ...(features.usage ? [{ href: "/usage", label: "Consumo", icon: Zap }] : []),
   { href: "/workspace",    label: "Workspace",   icon: Building2 },
   { href: "/settings",     label: "Configurações", icon: Settings },
   { label: "Sair",         icon: LogOut,         action: () => signOut({ callbackUrl: "/login" }) },

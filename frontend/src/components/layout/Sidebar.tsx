@@ -23,6 +23,7 @@ import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsCo
 import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
 import { UsageBanner } from "@/components/layout/UsageBanner";
 import { conversationsApi } from "@/lib/api";
+import { features } from "@/lib/feature-flags";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -179,8 +180,8 @@ export function Sidebar() {
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns && planAllows("allow_campaigns") },
     { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") && !isValidate },
     { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents && !isValidate },
-    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: planAllows("allow_helpdesk") },
-    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: !isValidate },
+    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: features.helpdesk && planAllows("allow_helpdesk") },
+    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: features.shops && !isValidate },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers && !isValidate },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations && !isValidate },
@@ -198,7 +199,7 @@ export function Sidebar() {
     { href: "/admin/users", label: t("nav_users"), icon: Users },
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
     { href: "/admin/providers", label: "Providers", icon: Layers },
-    { href: "/admin/usage", label: "Consumo Global", icon: Zap },
+    ...(features.usage ? [{ href: "/admin/usage", label: "Consumo Global", icon: Zap }] : []),
     // Uniq AI agora vive como aba dentro de /admin/providers (?tab=ai),
     // sem entrada solta na sidebar.
   ];

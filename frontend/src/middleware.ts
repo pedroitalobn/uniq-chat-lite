@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isRouteEnabled } from "@/lib/feature-flags";
 
 // País → idioma. Espanhol cobre América Latina, Inglês é o fallback global.
 const COUNTRY_LANG: Record<string, string> = {
@@ -14,6 +15,14 @@ const SUPPORTED = ["pt", "en", "es"];
 const COOKIE = "sc-lang";
 
 export function middleware(req: NextRequest) {
+  // White-label: bloqueia rotas de módulos desabilitados via env.
+  if (!isRouteEnabled(req.nextUrl.pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   const res = NextResponse.next();
 
   // Usuário já escolheu idioma manualmente → respeitar e não sobrescrever.

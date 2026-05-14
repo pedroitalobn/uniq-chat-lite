@@ -18,6 +18,7 @@ import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsCo
 import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
 import { UsageBanner } from "@/components/layout/UsageBanner";
 import { conversationsApi } from "@/lib/api";
+import { features } from "@/lib/feature-flags";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const DOCK_W_COLLAPSED = 64;   // px — icon-only mode
@@ -314,8 +315,8 @@ export function SidebarDock() {
     { href: "/campaigns",    label: t("nav_campaigns"),     icon: Megaphone,       show: canSeeCampaigns && planAllows("allow_campaigns") },
     { href: "/journeys",     label: "Jornadas",             icon: Wand2,           show: canSeeJourneys && planAllows("allow_journeys") },
     { href: "/agents",       label: "Agentes",              icon: Bot,             show: canSeeAgents },
-    { href: "/help-desk",    label: "Help Desk",            icon: BookOpen,        show: planAllows("allow_helpdesk") },
-    { href: "/shops",        label: "Shops",                icon: ShoppingBag,     show: true },
+    { href: "/help-desk",    label: "Help Desk",            icon: BookOpen,        show: features.helpdesk && planAllows("allow_helpdesk") },
+    { href: "/shops",        label: "Shops",                icon: ShoppingBag,     show: features.shops },
     { href: "/servers",      label: t("nav_servers"),       icon: Server,          show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),     icon: Smartphone,      show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"),  icon: Plug,            show: canSeeIntegrations },
@@ -435,7 +436,7 @@ export function SidebarDock() {
       <Divider />
 
       {/* ── Upgrade (free plan) ── */}
-      {canSeeBilling && planName?.toLowerCase() === "free" && (
+      {features.billing && canSeeBilling && planName?.toLowerCase() === "free" && (
         <div style={{ width: "100%", marginBottom: 2 }}>
           <ActionRow
             icon={Zap}
