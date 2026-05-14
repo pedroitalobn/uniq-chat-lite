@@ -111,6 +111,34 @@ type AsaasSubscriptionRequest struct {
 	NextDueDate       string  `json:"nextDueDate"`
 	Description       string  `json:"description,omitempty"`
 	ExternalReference string  `json:"externalReference,omitempty"`
+	// Campos exigidos quando BillingType=CREDIT_CARD em modo transparente
+	// (cobrança recorrente cartão sem redirect). Asaas tokeniza no primeiro
+	// charge e usa o token nas próximas faturas — não precisamos guardar.
+	CreditCard           *AsaasCreditCard           `json:"creditCard,omitempty"`
+	CreditCardHolderInfo *AsaasCreditCardHolderInfo `json:"creditCardHolderInfo,omitempty"`
+	RemoteIP             string                     `json:"remoteIp,omitempty"`
+}
+
+// AsaasCreditCard — dados do cartão pra cobrança transparente.
+type AsaasCreditCard struct {
+	HolderName  string `json:"holderName"`
+	Number      string `json:"number"`
+	ExpiryMonth string `json:"expiryMonth"`
+	ExpiryYear  string `json:"expiryYear"`
+	Ccv         string `json:"ccv"`
+}
+
+// AsaasCreditCardHolderInfo — dados do dono do cartão (antifraude). Asaas
+// exige name/email/cpfCnpj/postalCode/addressNumber/phone como mínimo.
+type AsaasCreditCardHolderInfo struct {
+	Name          string `json:"name"`
+	Email         string `json:"email"`
+	CpfCnpj       string `json:"cpfCnpj"`
+	PostalCode    string `json:"postalCode"`
+	AddressNumber string `json:"addressNumber"`
+	AddressComplement string `json:"addressComplement,omitempty"`
+	Phone         string `json:"phone"`
+	MobilePhone   string `json:"mobilePhone,omitempty"`
 }
 
 type AsaasSubscriptionResponse struct {
