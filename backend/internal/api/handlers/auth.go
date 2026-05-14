@@ -1808,13 +1808,20 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			// signup pra mesma sessão reidentifique o mesmo contrato (sem
 			// criar duplicados se o user clicar duas vezes).
 			contractID := "uniq-" + pending.ID.String() + "-" + plan.ID.String()
+			now := time.Now()
 			authReq := AsaasPixAutomaticAuthRequest{
 				Customer:          customerID,
 				Value:             plan.Price,
 				Frequency:         "MONTHLY",
 				ContractID:        contractID,
+				StartDate:         now.Format("2006-01-02"),
+				NextDueDate:       now.Format("2006-01-02"),
+				// Consentimento válido por 5 anos. Asaas/BACEN tipicamente
+				// aceita até esse horizonte e o cliente pode revogar a
+				// autorização quando quiser; renovação acontece se a gente
+				// recriar a autorização antes do vencimento.
+				ExpirationDate:    now.AddDate(5, 0, 0).Format("2006-01-02"),
 				Cycle:             "MONTHLY",
-				NextDueDate:       time.Now().Format("2006-01-02"),
 				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
 				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
 			}

@@ -674,29 +674,6 @@ function CompleteForm({
       {/* Stepper visual — orienta o usuário em qual etapa está */}
       <StepDots current={step} total={maxStep + 1} />
 
-
-      <div className="flex items-center justify-center gap-1.5">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <div
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: i === step ? 24 : 7,
-                height: 7,
-                background: i <= step ? "#00d46a" : "var(--border-default)",
-                opacity: i <= step ? 1 : 0.45,
-              }}
-            />
-            {i < 2 && (
-              <div
-                className="h-px w-6 transition-all duration-300"
-                style={{ background: i < step ? "#00d46a" : "var(--border-default)" }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
       <AnimatePresence mode="wait">
         {step === 0 && (
           <motion.div
