@@ -252,12 +252,17 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       return r.data as TimelinePayload;
     },
     getNextPageParam: (last) => {
-      const items = last.items ?? [];
+      // Em alguns ciclos do TanStack Query v5 a página vem como undefined
+      // (resposta vazia, queryFn que devolveu null em erro, hidratação
+      // parcial). Antes a gente fazia `last.items ?? []` e o derreferenciamento
+      // de `last` quebrava com "Cannot read properties of undefined". Agora
+      // toda a chain é optional + checada com Array.isArray.
+      const items = Array.isArray(last?.items) ? last.items : [];
       if (items.length < TIMELINE_PAGE) return undefined; // sem mais antigas
       // `items` chegam DESC (mais novo primeiro); a mais antiga é a última.
       return items[items.length - 1]?.at;
     },
-    enabled: !!wsId && canView,
+    enabled: !!wsId && canView && !!conversationId,
     // Polling reduzido: WS dispara invalidate em conversation.message,
     // então 30s é fallback caso o WS caia. Polling agressivo (2s) fazia
     // <audio src> "mudar" toda vez que ResolveMediaURLs gerava signed URL
@@ -567,11 +572,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   // Achata todas as páginas da infinite query (desc → asc) e remove
   // duplicatas caso backend reemita um item na borda entre pages.
   const timelineAll = useMemo(() => {
-    const pages = timelineQ.data?.pages ?? [];
+    const pages = Array.isArray(timelineQ.data?.pages) ? timelineQ.data!.pages : [];
     const seen = new Set<string>();
     const out: TimelinePayload["items"] = [];
     for (const p of pages) {
-      for (const it of p.items ?? []) {
+      // p pode ser undefined em estados transitórios da infinite query;
+      // optional chain garante que nem `p.items` nem o for-of estoura.
+      const items = Array.isArray(p?.items) ? p!.items : [];
+      for (const it of items) {
         const key = `${it.kind}-${it.id}`;
         if (seen.has(key)) continue;
         seen.add(key);
