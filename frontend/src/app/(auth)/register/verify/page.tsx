@@ -1068,9 +1068,74 @@ function VerifyContent() {
   }, [token]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ background: "hsl(240 18% 4%)" }}>
-      <div className="w-full max-w-sm flex flex-col gap-8">
+    <div
+      className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(1200px 600px at 20% 0%, rgba(0,212,106,0.18), transparent 60%)," +
+          "radial-gradient(900px 500px at 100% 100%, rgba(99,102,241,0.16), transparent 65%)," +
+          "radial-gradient(700px 400px at 50% 50%, rgba(124,58,237,0.10), transparent 70%)," +
+          "linear-gradient(180deg, hsl(240 22% 3%) 0%, hsl(240 18% 4%) 50%, hsl(240 22% 3%) 100%)",
+      }}
+    >
+      {/* Halos animados pra dar sensação de aura futurista. pointer-events
+         none pra não bloquear cliques. */}
+      <motion.div
+        aria-hidden
+        className="absolute pointer-events-none rounded-full"
+        style={{
+          width: 520, height: 520,
+          top: "-12%", left: "-10%",
+          background: "radial-gradient(circle, rgba(0,212,106,0.30) 0%, transparent 65%)",
+          filter: "blur(40px)",
+        }}
+        animate={{ x: [0, 30, 0], y: [0, 20, 0], opacity: [0.6, 0.9, 0.6] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden
+        className="absolute pointer-events-none rounded-full"
+        style={{
+          width: 480, height: 480,
+          bottom: "-15%", right: "-12%",
+          background: "radial-gradient(circle, rgba(99,102,241,0.28) 0%, transparent 65%)",
+          filter: "blur(40px)",
+        }}
+        animate={{ x: [0, -25, 0], y: [0, -15, 0], opacity: [0.55, 0.85, 0.55] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+      />
+      {/* Grid sutil — vetor SVG inline, dá impressão de plano holográfico. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
+        }}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-sm flex flex-col gap-6 rounded-3xl p-6 sm:p-8"
+        style={{
+          background:
+            "linear-gradient(160deg, rgba(20,24,40,0.78), rgba(12,14,24,0.78))",
+          backdropFilter: "blur(28px) saturate(180%)",
+          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow:
+            "0 40px 80px rgba(0,0,0,0.55)," +
+            "0 16px 40px rgba(0,212,106,0.08)," +
+            "inset 0 1px 0 rgba(255,255,255,0.10)," +
+            "inset 0 -1px 0 rgba(0,0,0,0.30)",
+        }}
+      >
         <div className="flex justify-center">
           <Logo />
         </div>
@@ -1181,7 +1246,7 @@ function VerifyContent() {
             Fazer login
           </Link>
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }
