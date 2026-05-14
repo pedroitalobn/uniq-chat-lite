@@ -103,11 +103,31 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 				Str("instance", instanceID).
 				Str("agent", job.AgentName).
 				Msg("agent-reply-queue: instância pausada por segurança, descartando job")
+			_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+				InstanceID:    instanceID,
+				ToJID:         job.ToJID,
+				Content:       job.Reply,
+				Direction:     models.DirectionOut,
+				Type:          "text",
+				Status:        models.MessageStatusFailed,
+				DeliveryError: "Instância pausada por segurança anti-ban — mensagem não enviada",
+			})
 			continue
 		}
 		client := q.manager.GetInstance(instanceID)
 		if client == nil || !client.IsConnected() {
 			log.Warn().Str("instance", instanceID).Msg("agent-reply-queue: instância desconectada, descartando job")
+			if q.manager != nil {
+				_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+					InstanceID:    instanceID,
+					ToJID:         job.ToJID,
+					Content:       job.Reply,
+					Direction:     models.DirectionOut,
+					Type:          "text",
+					Status:        models.MessageStatusFailed,
+					DeliveryError: "Instância desconectada — mensagem não enviada",
+				})
+			}
 			continue
 		}
 
@@ -140,6 +160,25 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 					Str("instance", instanceID).
 					Str("to", job.ToJID).
 					Msg("agent-reply-queue: send falhou")
+				// Persiste com status=failed pra que o operador veja a bolha
+				// no inbox marcada "Não enviado" + motivo, em vez da
+				// mensagem simplesmente sumir (caso clássico: circuit
+				// breaker de safety pausou a instância no meio do reply).
+				if q.manager != nil {
+					_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+						InstanceID:    instanceID,
+						ToJID:         job.ToJID,
+						Content:       bubble,
+						Direction:     models.DirectionOut,
+						Type:          "text",
+						Status:        models.MessageStatusFailed,
+						DeliveryError: truncateErr(err.Error(), 500),
+					})
+				}
+				// Quando uma bolha falha o resto também vai falhar (circuit
+				// breaker / instância pausada). Para o loop pra não gerar
+				// 4 logs vermelhos seguidos.
+				break
 			} else {
 				if q.manager != nil {
 					_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
@@ -363,4 +402,13 @@ func jitterMS(minMS, maxMS int) time.Duration {
 		return time.Duration(minMS) * time.Millisecond
 	}
 	return time.Duration(minMS+mathrand.Intn(maxMS-minMS)) * time.Millisecond
+}
+
+// truncateErr — corta texto com sufixo "…" quando passa do limite. Inline
+// em vez de exportar de outro pacote pra evitar dependency cycle.
+func truncateErr(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }

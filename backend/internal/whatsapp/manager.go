@@ -463,6 +463,13 @@ type SaveMessageInput struct {
 	SenderJID         string
 	ExternalMessageID string // ex.: stanza_id WhatsApp (v.Info.ID)
 	ReplyToExternalID string // stanza_id da msg citada — resolve pra ReplyToID
+	// Status + DeliveryError são opcionais. Quando o caller já sabe que o
+	// envio falhou (circuit breaker, instância pausada, sem rede), passa
+	// MessageStatusFailed + a mensagem de erro pra que o operador veja a
+	// bolha no inbox como "Não enviado" + motivo, em vez de a mensagem
+	// simplesmente nunca aparecer.
+	Status        models.MessageStatus
+	DeliveryError string
 }
 
 // SaveMessageEx é a versão completa do save. Recebe um struct pra evoluir
@@ -619,6 +626,10 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 		senderName = extractPhoneFromJID(senderJID)
 	}
 
+	status := in.Status
+	if status == "" {
+		status = models.MessageStatusSent
+	}
 	logEntry := models.MessageLog{
 		ID:                uuid.New(),
 		InstanceID:        instUUID,
@@ -630,7 +641,8 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 		SenderJID:         senderJID,
 		SenderName:        senderName,
 		Content:           string(contentJSON),
-		Status:            models.MessageStatusSent,
+		Status:            status,
+		DeliveryError:     in.DeliveryError,
 		ExternalMessageID: in.ExternalMessageID,
 	}
 

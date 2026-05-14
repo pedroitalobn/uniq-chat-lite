@@ -1535,12 +1535,8 @@ function MessageBubble({
           <ReactionChips reactions={reactions} isOut={isOut} />
         </div>
       </div>
-      {isOut && m.status === "failed" && m.delivery_error && (
-        <div className="flex justify-end mt-0.5 px-1">
-          <p className="text-[11px] max-w-[80%] text-right" style={{ color: "#f87171" }}>
-            {m.delivery_error}
-          </p>
-        </div>
+      {isOut && m.status === "failed" && (
+        <NotSentLabel reason={m.delivery_error} />
       )}
       </>
     );
@@ -1638,12 +1634,38 @@ function MessageBubble({
         <ReactionChips reactions={reactions} isOut={isOut} />
       </div>
     </div>
-    {isOut && m.status === "failed" && m.delivery_error && (
-      <div className="flex justify-end mt-0.5 px-1">
-        <p className="text-[11px] max-w-[80%] text-right" style={{ color: "#f87171" }}>{m.delivery_error}</p>
-      </div>
+    {isOut && m.status === "failed" && (
+      <NotSentLabel reason={m.delivery_error} />
     )}
     </>
+  );
+}
+
+// NotSentLabel — pill abaixo de bolhas outbound que falharam. Renderiza
+// SEMPRE pra status=failed, mesmo sem delivery_error setado, pra que o
+// operador nunca veja a bolha "vestida de enviada" quando o circuit
+// breaker / safety pause / desconexão impediu a entrega real.
+function NotSentLabel({ reason }: { reason?: string }) {
+  return (
+    <div className="flex justify-end mt-1 px-1">
+      <div
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 max-w-[85%]"
+        style={{
+          background: "rgba(239,68,68,0.10)",
+          border: "1px solid rgba(239,68,68,0.30)",
+        }}
+      >
+        <AlertCircle className="h-3 w-3 flex-shrink-0" style={{ color: "#ef4444" }} />
+        <span className="text-[11px] font-semibold" style={{ color: "#f87171" }}>
+          Não enviado
+        </span>
+        {reason && (
+          <span className="text-[11px]" style={{ color: "#f87171", opacity: 0.85 }}>
+            · {reason}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
