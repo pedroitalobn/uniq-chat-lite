@@ -102,9 +102,14 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
-      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
-      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
-      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Admin}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-${ADMIN_EMAIL}}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-${ADMIN_PASSWORD}}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-${ADMIN_NAME:-Admin}}
+      # White-label bootstrap — aplica migrations do lite + cria admin no boot.
+      BOOTSTRAP_ON_START: ${BOOTSTRAP_ON_START:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME:-Admin}
       INSTAGRAM_BASE_URL: http://uniqchat-instagram-bridge:8091
       # ── Meta WhatsApp Cloud API (WABA Tech Provider) ────────────────────
       META_APP_ID: ${META_APP_ID}
@@ -125,10 +130,15 @@ services:
       dockerfile: Dockerfile
       args:
         # NEXT_PUBLIC_* são build-time no Next.js — obrigatório passar via args
-        NEXT_PUBLIC_API_URL: https://api.uniq.chat
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.uniq.chat}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
         NEXT_PUBLIC_META_APP_ID: ${META_APP_ID}
         NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID}
+        # White-label feature flags — default oculto.
+        NEXT_PUBLIC_ENABLE_SHOPS: ${NEXT_PUBLIC_ENABLE_SHOPS:-false}
+        NEXT_PUBLIC_ENABLE_HELPDESK: ${NEXT_PUBLIC_ENABLE_HELPDESK:-false}
+        NEXT_PUBLIC_ENABLE_BILLING: ${NEXT_PUBLIC_ENABLE_BILLING:-false}
+        NEXT_PUBLIC_ENABLE_USAGE: ${NEXT_PUBLIC_ENABLE_USAGE:-false}
     container_name: uniqchat-frontend
     restart: unless-stopped
     depends_on:
