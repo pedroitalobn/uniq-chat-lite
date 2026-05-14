@@ -213,6 +213,22 @@ func getStripeCheckoutType(db *gorm.DB) string {
 	return stripeCheckoutType
 }
 
+// getAsaasCheckoutType — lê o modo de checkout Asaas do admin settings.
+// Default "transparent" (PIX QR inline + invoice url). "redirect" envia
+// o usuário direto pra página hospedada pelo Asaas via invoiceUrl da
+// primeira fatura.
+func getAsaasCheckoutType(db *gorm.DB) string {
+	var settings models.PaymentSettings
+	if err := db.Where("id = ?", "default").First(&settings).Error; err != nil {
+		return "transparent"
+	}
+	t := strings.ToLower(strings.TrimSpace(settings.AsaasCheckoutType))
+	if t != "redirect" && t != "transparent" {
+		return "transparent"
+	}
+	return t
+}
+
 // Register godoc
 // POST /auth/register
 // Body: { "name": "...", "email": "...", "username": "...", "password": "...", "workspace_name": "...", "invite_code": "...", "plan_id": "..." }
@@ -1675,9 +1691,10 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			// Cria customer no Asaas
 			custReq := AsaasCustomerRequest{
-				Name:  req.Name,
-				Email: pending.Email,
-				Cpf:   cpf,
+				Name:        req.Name,
+				Email:       pending.Email,
+				CpfCnpj:     cpf,
+				MobilePhone: req.Phone,
 			}
 			custBody, _ := json.Marshal(custReq)
 			custResp, err := h.asaasH.apiRequest("POST", "/api/v3/customers", custBody)
@@ -1730,6 +1747,37 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			json.Unmarshal(listResp, &listed)
 
+			firstInvoiceURL := ""
+			firstPaymentID := ""
+			if len(listed.Data) > 0 {
+				firstInvoiceURL = listed.Data[0].InvoiceURL
+				firstPaymentID = listed.Data[0].ID
+			}
+
+			// Honra o modo de checkout configurado no admin
+			// (/admin/payment-settings). Default "transparent" mantém o
+			// fluxo de subscription com fatura inline (frontend abre
+			// /checkout exibindo invoice + QR). "redirect" manda o user
+			// direto pra página hospedada da Asaas usando invoiceUrl
+			// — análogo ao redirect do Stripe Checkout Session.
+			mode := getAsaasCheckoutType(h.db)
+			if mode == "redirect" {
+				if firstInvoiceURL == "" {
+					return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+						"error":   "asaas_no_invoice",
+						"message": "Assinatura criada mas primeira fatura não retornada ainda — tente novamente em alguns segundos.",
+					})
+				}
+				return c.JSON(fiber.Map{
+					"checkout_type":   "redirect",
+					"url":             firstInvoiceURL,
+					"subscription_id": subResp.ID,
+					"plan_name":       plan.Name,
+					"plan_price":      plan.Price,
+					"pending_id":      pending.ID.String(),
+				})
+			}
+
 			out := fiber.Map{
 				"checkout_type":   "subscription",
 				"subscription_id": subResp.ID,
@@ -1741,9 +1789,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				"pending_id":      pending.ID.String(),
 				"message":         "Assinatura PIX recorrente criada. Pague a primeira fatura pra ativar.",
 			}
-			if len(listed.Data) > 0 {
-				out["first_invoice_url"] = listed.Data[0].InvoiceURL
-				out["first_payment_id"] = listed.Data[0].ID
+			if firstInvoiceURL != "" {
+				out["first_invoice_url"] = firstInvoiceURL
+				out["first_payment_id"] = firstPaymentID
 			}
 			return c.JSON(out)
 
