@@ -639,6 +639,18 @@ function CompleteForm({
       // Asaas subscription c/ cartão (recorrência via tokenização). Plano
       // já está ativo — não precisa de checkout, redireciona pro success.
       if (data.checkout_type === "subscription" && data.subscription_id) {
+        // Cartão: subscription já cobrada/tokenizada no Asaas; o usuário
+        // não precisa ver QR. Auto-login e manda direto pro dashboard.
+        if (asaasMethod === "credit_card") {
+          if (data.access_token) {
+            await signIn("credentials", {
+              access_token: data.access_token,
+              redirect: false,
+            });
+          }
+          router.push("/dashboard?welcome=1");
+          return;
+        }
         const params = new URLSearchParams({
           subscription_id: data.subscription_id,
           plan_name: data.plan_name ?? "",
