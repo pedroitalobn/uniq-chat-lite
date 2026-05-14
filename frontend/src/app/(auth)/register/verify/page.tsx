@@ -9,6 +9,7 @@ import {
   ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, FileText,
   Search, ChevronDown, ShieldCheck, BadgeCheck, KeyRound,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
 
@@ -391,6 +392,16 @@ function CompleteForm({
   // null = ainda não escolheu. Forçar a escolha evita disparo de PIX
   // sem o user ter realmente decidido.
   const [asaasMethod, setAsaasMethod] = useState<"pix_automatic" | "credit_card" | null>(null);
+  // Quando o user finaliza com PIX Automático, exibimos o QR inline aqui
+  // mesmo no modal (sem redirect pra /checkout). "Trocar método" vira
+  // só um setPixQrState(null) — o form fica intacto.
+  const [pixQrState, setPixQrState] = useState<null | {
+    brCode: string;
+    brCodeBase64: string;
+    planName: string;
+    planPrice: number;
+    authorizationId: string;
+  }>(null);
   const [card, setCard] = useState({
     holderName: "",
     number: "",
@@ -495,11 +506,6 @@ function CompleteForm({
     if (nextStep === 2) {
       if (password.length < 8) e.password = "Mínimo 8 caracteres";
       if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
-    }
-    if (nextStep === 3 && isPaid) {
-      if (!asaasMethod) {
-        e.global = "Escolha uma forma de pagamento (PIX Automático ou Cartão)";
-      }
     }
     if (nextStep === 3 && isPaid && asaasMethod === "credit_card") {
       if (!card.holderName.trim()) e.cardHolder = "Nome no cartão é obrigatório";
@@ -619,17 +625,15 @@ function CompleteForm({
       // Asaas PIX Automático: cliente paga 1 QR (autoriza + 1ª parcela),
       // próximos meses debitados automaticamente sem QR novo.
       if (data.checkout_type === "pix_automatic" && data.br_code) {
-        const params = new URLSearchParams({
-          br_code: data.br_code,
-          br_code_base64: data.br_code_base64 ?? "",
-          plan_name: data.plan_name ?? "",
-          plan_price: String(data.plan_price ?? ""),
-          email,
-          mode: "pix_automatic",
+        // Renderiza o QR DENTRO do próprio modal de signup — sem
+        // navegação. "Trocar método" preserva os campos.
+        setPixQrState({
+          brCode: data.br_code,
+          brCodeBase64: data.br_code_base64 ?? "",
+          planName: data.plan_name ?? "",
+          planPrice: data.plan_price ?? 0,
+          authorizationId: data.authorization_id ?? "",
         });
-        if (data.pending_id) params.set("pending_id", data.pending_id);
-        if (data.authorization_id) params.set("authorization_id", data.authorization_id);
-        router.push(`/checkout?${params.toString()}`);
         return;
       }
       // Asaas subscription c/ cartão (recorrência via tokenização). Plano
@@ -687,6 +691,14 @@ function CompleteForm({
             : "Quase lá — só mais algumas informações"}
         </p>
       </div>
+
+      {pixQrState ? (
+        <PixQrInlineView
+          state={pixQrState}
+          onChangeMethod={() => setPixQrState(null)}
+        />
+      ) : (
+        <>
       {/* Stepper visual — orienta o usuário em qual etapa está */}
       <StepDots current={step} total={maxStep + 1} />
 
@@ -1044,6 +1056,8 @@ function CompleteForm({
           </button>
         )}
       </div>
+      </>
+      )}
     </form>
   );
 }
@@ -1448,5 +1462,107 @@ function StepDots({ current, total }: { current: number; total: number }) {
         );
       })}
     </div>
+  );
+}
+
+// PixQrInlineView — renderiza o QR do PIX Automático dentro do próprio
+// modal de signup, em vez de navegar pra /checkout. Isso preserva o
+// estado do form se o user quiser "Trocar método" (botão de cancelar
+// o QR e voltar pro picker de pagamento).
+function PixQrInlineView({
+  state,
+  onChangeMethod,
+}: {
+  state: {
+    brCode: string;
+    brCodeBase64: string;
+    planName: string;
+    planPrice: number;
+    authorizationId: string;
+  };
+  onChangeMethod: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(state.brCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // ignore — fallback é selecionar o texto manualmente
+    }
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex flex-col gap-4"
+    >
+      <div
+        className="rounded-2xl p-4 text-center"
+        style={{
+          background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
+          border: "1px solid rgba(0,212,106,0.25)",
+        }}
+      >
+        <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
+          Pague pra ativar
+        </p>
+        <p className="text-sm font-bold mt-0.5" style={{ color: "var(--text-1)" }}>
+          {state.planName || "Plano"}
+        </p>
+        <p className="text-base font-bold mt-0.5" style={{ color: "var(--green)" }}>
+          R$ {Number(state.planPrice).toFixed(2).replace(".", ",")}
+        </p>
+      </div>
+
+      {/* QR — alto contraste pra escanear de qualquer banco */}
+      <div className="flex justify-center">
+        <div className="inline-flex rounded-2xl p-4" style={{ background: "#ffffff" }}>
+          <QRCodeSVG
+            value={state.brCode}
+            size={220}
+            level="M"
+            bgColor="#ffffff"
+            fgColor="#000000"
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={copy}
+        className="rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+        style={{
+          background: copied ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
+          border: `1px solid ${copied ? "rgba(0,212,106,0.35)" : "var(--surface-border)"}`,
+          color: copied ? "var(--green)" : "var(--text-1)",
+        }}
+      >
+        {copied ? "Copiado!" : "Copiar PIX Copia e Cola"}
+      </button>
+
+      <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <p style={{ color: "var(--text-2)" }}>
+          1. Abra o app do seu banco e escolha pagar PIX.
+        </p>
+        <p style={{ color: "var(--text-2)" }}>
+          2. Escaneie o QR ou cole o código acima.
+        </p>
+        <p style={{ color: "var(--text-2)" }}>
+          3. Confirme — você autoriza este pagamento e os próximos meses são debitados automaticamente.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onChangeMethod}
+        className="text-xs underline underline-offset-2"
+        style={{ color: "var(--text-3)" }}
+      >
+        Trocar método de pagamento
+      </button>
+    </motion.div>
   );
 }
