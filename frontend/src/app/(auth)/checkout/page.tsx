@@ -344,7 +344,17 @@ function CheckoutContent() {
               <ArrowLeft className="w-4 h-4" /> Voltar
             </button>
           )}
-          {step === "checkout" && hasBrCode && <div />}
+          {/* PIX QR (PIX Automático ou subscription) — botão Voltar leva
+             pro /register/verify pra que o user troque o método. */}
+          {step === "checkout" && hasBrCode && (
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-1 text-sm hover:opacity-80 transition-opacity"
+              style={{ color: "var(--text-3)" }}
+            >
+              <ArrowLeft className="w-4 h-4" /> Trocar método
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4" style={{ color: "var(--green)" }} />
             <span className="text-xs font-medium" style={{ color: "var(--green)" }}>Checkout Seguro</span>
@@ -422,9 +432,10 @@ function CheckoutContent() {
                   >
                     <QRCodeSVG
                       value={checkoutData.br_code}
-                      size={160}
+                      size={200}
                       level="M"
-                      fgColor="var(--text-1)"
+                      bgColor="#ffffff"
+                      fgColor="#000000"
                     />
                   </motion.div>
                   <p className="text-xs mb-1" style={{ color: "hsl(240 8% 46%)" }}>
