@@ -479,6 +479,7 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 			authObj = paymentEvent
 		}
 		authID, _ := authObj["id"].(string)
+		customerID, _ := authObj["customer"].(string)
 		externalRef, _ := authObj["externalReference"].(string)
 		if externalRef != "" && authID != "" {
 			parts := strings.Split(externalRef, "|")
@@ -487,11 +488,20 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 				planID := parts[1]
 				var plan models.Plan
 				if h.db.First(&plan, "id = ?", planID).Error == nil {
-					h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{
+					// Próxima cobrança: ~23 dias à frente, deixando o cron
+					// criá-la ~7 dias antes da dueDate de +30 dias.
+					nextCharge := time.Now().AddDate(0, 0, 23)
+					updates := map[string]any{
 						"plan_id":                   plan.ID,
 						"asaas_subscription_id":     authID,
 						"asaas_subscription_status": "active",
-					})
+						"asaas_flow":                "pix_automatic",
+						"asaas_next_charge_at":      nextCharge,
+					}
+					if customerID != "" {
+						updates["asaas_customer_id"] = customerID
+					}
+					h.db.Model(&models.User{}).Where("id = ?", userID).Updates(updates)
 				}
 			}
 		}

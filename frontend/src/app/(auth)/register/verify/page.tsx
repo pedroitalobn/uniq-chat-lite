@@ -386,6 +386,18 @@ function CompleteForm({
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [step, setStep] = useState(0);
+  // Asaas: forma de pagamento. Default PIX Automático (consentimento +
+  // débitos auto). Cartão usa CREDIT_CARD transparente.
+  const [asaasMethod, setAsaasMethod] = useState<"pix_automatic" | "credit_card">("pix_automatic");
+  const [card, setCard] = useState({
+    holderName: "",
+    number: "",
+    expiryMonth: "",
+    expiryYear: "",
+    cvv: "",
+    postalCode: "",
+    addressNumber: "",
+  });
   // Quando o pending já traz plan_id (user veio de /plans → /register?plan_id=...)
   // pulamos o picker — ele já escolheu, não faz sentido perguntar de novo.
   // Caso contrário busca a lista pública e deixa escolher.
@@ -514,6 +526,18 @@ function CompleteForm({
           account_type: accountType,
           company_name: company.trim() || undefined,
           plan_id: selectedPlanID || undefined,
+          asaas_payment_method: asaasMethod,
+          asaas_card: asaasMethod === "credit_card" ? {
+            holder_name: card.holderName,
+            number: card.number.replace(/\s+/g, ""),
+            expiry_month: card.expiryMonth,
+            expiry_year: card.expiryYear,
+            cvv: card.cvv,
+          } : undefined,
+          asaas_holder: asaasMethod === "credit_card" ? {
+            postal_code: card.postalCode.replace(/\D/g, ""),
+            address_number: card.addressNumber,
+          } : undefined,
         }),
       });
       const data = await res.json();
@@ -560,7 +584,24 @@ function CompleteForm({
         router.push(`/checkout?${params.toString()}`);
         return;
       }
-      // Paid plan, Asaas subscription (PIX recorrente)
+      // Asaas PIX Automático: cliente paga 1 QR (autoriza + 1ª parcela),
+      // próximos meses debitados automaticamente sem QR novo.
+      if (data.checkout_type === "pix_automatic" && data.br_code) {
+        const params = new URLSearchParams({
+          br_code: data.br_code,
+          br_code_base64: data.br_code_base64 ?? "",
+          plan_name: data.plan_name ?? "",
+          plan_price: String(data.plan_price ?? ""),
+          email,
+          mode: "pix_automatic",
+        });
+        if (data.pending_id) params.set("pending_id", data.pending_id);
+        if (data.authorization_id) params.set("authorization_id", data.authorization_id);
+        router.push(`/checkout?${params.toString()}`);
+        return;
+      }
+      // Asaas subscription c/ cartão (recorrência via tokenização). Plano
+      // já está ativo — não precisa de checkout, redireciona pro success.
       if (data.checkout_type === "subscription" && data.subscription_id) {
         const params = new URLSearchParams({
           subscription_id: data.subscription_id,
@@ -724,6 +765,81 @@ function CompleteForm({
             exit={{ opacity: 0, x: -16 }}
             className="flex flex-col gap-5"
           >
+            {isPaid && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-[hsl(240_15%_65%)]">Forma de pagamento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: "pix_automatic", label: "PIX Automático", hint: "Autoriza 1x · débito mensal automático" },
+                    { id: "credit_card", label: "Cartão de crédito", hint: "Cobrança recorrente, sem QR mensal" },
+                  ] as const).map((opt) => {
+                    const active = asaasMethod === opt.id;
+                    return (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() => setAsaasMethod(opt.id)}
+                        className="rounded-xl p-3 text-left transition"
+                        style={{
+                          background: active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
+                          border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                          color: active ? "var(--green)" : "var(--text-2)",
+                        }}
+                      >
+                        <p className="text-sm font-semibold">{opt.label}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{opt.hint}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {asaasMethod === "credit_card" && (
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <input
+                      type="text" placeholder="Nome no cartão"
+                      value={card.holderName}
+                      onChange={(e) => setCard((c) => ({ ...c, holderName: e.target.value }))}
+                      className="input-field text-xs col-span-2"
+                    />
+                    <input
+                      type="text" placeholder="Número do cartão" inputMode="numeric"
+                      value={card.number}
+                      onChange={(e) => setCard((c) => ({ ...c, number: e.target.value.replace(/[^\d ]/g, "") }))}
+                      className="input-field text-xs col-span-2"
+                    />
+                    <input
+                      type="text" placeholder="MM" inputMode="numeric" maxLength={2}
+                      value={card.expiryMonth}
+                      onChange={(e) => setCard((c) => ({ ...c, expiryMonth: e.target.value.replace(/\D/g, "") }))}
+                      className="input-field text-xs"
+                    />
+                    <input
+                      type="text" placeholder="AAAA" inputMode="numeric" maxLength={4}
+                      value={card.expiryYear}
+                      onChange={(e) => setCard((c) => ({ ...c, expiryYear: e.target.value.replace(/\D/g, "") }))}
+                      className="input-field text-xs"
+                    />
+                    <input
+                      type="text" placeholder="CVV" inputMode="numeric" maxLength={4}
+                      value={card.cvv}
+                      onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, "") }))}
+                      className="input-field text-xs col-span-2"
+                    />
+                    <input
+                      type="text" placeholder="CEP" inputMode="numeric"
+                      value={card.postalCode}
+                      onChange={(e) => setCard((c) => ({ ...c, postalCode: e.target.value }))}
+                      className="input-field text-xs"
+                    />
+                    <input
+                      type="text" placeholder="Número do endereço"
+                      value={card.addressNumber}
+                      onChange={(e) => setCard((c) => ({ ...c, addressNumber: e.target.value }))}
+                      className="input-field text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Field
                 label="Crie uma senha"
