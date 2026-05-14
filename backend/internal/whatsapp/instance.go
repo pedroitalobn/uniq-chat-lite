@@ -646,7 +646,31 @@ func (ic *InstanceClient) sendMessage(ctx context.Context, recipient types.JID, 
 			return whatsmeow.SendResponse{}, err
 		}
 	}
-	return ic.client.SendMessage(ctx, recipient, msg)
+	resp, err := ic.client.SendMessage(ctx, recipient, msg)
+	if err != nil {
+		return resp, err
+	}
+	// Participant list hash mismatch — algumas das devices do destinatário
+	// ficaram sem a mensagem (mostra "Aguardando mensagem..." no WhatsApp).
+	// whatsmeow já invalidou o cache de devices; basta reenviar uma vez
+	// com a lista atualizada. Preservamos o msgID original devolvido pra
+	// não duplicar o registro no Inbox.
+	if resp.IncompleteDelivery {
+		log.Warn().
+			Str("instance", ic.ID).
+			Str("to", recipient.String()).
+			Str("msg_id", resp.ID).
+			Msg("incomplete delivery: refreshing device list and resending")
+		retryCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, devErr := ic.client.GetUserDevicesContext(retryCtx, []types.JID{recipient.ToNonAD()}); devErr != nil {
+			log.Warn().Err(devErr).Str("to", recipient.String()).Msg("device list refresh failed before resend")
+		}
+		if _, retryErr := ic.client.SendMessage(retryCtx, recipient, msg, whatsmeow.SendRequestExtra{ID: resp.ID}); retryErr != nil {
+			log.Warn().Err(retryErr).Str("to", recipient.String()).Str("msg_id", resp.ID).Msg("resend after participant hash mismatch failed")
+		}
+	}
+	return resp, nil
 }
 
 func safetyMessageSummary(msg *waE2E.Message) (string, string) {

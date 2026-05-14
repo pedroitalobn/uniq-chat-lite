@@ -126,6 +126,12 @@ type SendResponse struct {
 	// The identity the message was sent with (LID or PN)
 	// This is currently not reliable in all cases.
 	Sender types.JID
+
+	// IncompleteDelivery is true when the server reported a participant list
+	// hash mismatch — the message may not have reached every device the
+	// recipient has online. Callers can retry the send: whatsmeow already
+	// invalidated the device list cache so the next send refetches it.
+	IncompleteDelivery bool
 }
 
 // SendRequestExtra contains the optional parameters for SendMessage.
@@ -459,6 +465,7 @@ func (cli *Client) SendMessage(ctx context.Context, to types.JID, message *waE2E
 	expectedPHash := ag.OptionalString("phash")
 	if len(expectedPHash) > 0 && phash != expectedPHash {
 		cli.Log.Warnf("Server returned different participant list hash (%s != %s) when sending to %s. Some devices may not have received the message.", phash, expectedPHash, to)
+		resp.IncompleteDelivery = true
 		switch to.Server {
 		case types.GroupServer:
 			// TODO also invalidate device list caches
