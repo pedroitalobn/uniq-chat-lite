@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { campaignsApi, instancesApi, groupsApi, wabaApi } from "@/lib/api";
 import { Campaign, Instance } from "@/types";
@@ -10,6 +10,7 @@ import {
   File, FileVideo, Download, ChevronLeft, ChevronRight, Users2, Database, UserCheck,
   MessageCircle, UserPlus, UserMinus, Heart, Send, Shield,
   Upload, Hash, AtSign, Shuffle, Search,
+  MapPin, Phone, Sticker, Vote, MousePointer, Banknote, LayoutTemplate, ListTree, GalleryHorizontalEnd,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -39,12 +40,27 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; ico
   failed:    { label: "Cancelada",  color: "#ef4444", bg: "rgba(239,68,68,0.1)",   icon: AlertCircle },
 };
 
+// MSG_TYPES — todos os tipos suportados pelo dispatcher de campanha.
+// "simple" são os tipos que aceitam corpo livre (texto/mídia/legenda);
+// os demais exigem config específica (template/list/buttons/etc) que
+// hoje é tratada como envio com texto+placeholder até o handler
+// estender o suporte completo. Mantemos no UI pra refletir paridade
+// com os tipos que o agente já reconhece (PR #35).
 const MSG_TYPES = [
-  { value: "text",     label: "Texto",     icon: FileText },
-  { value: "image",    label: "Imagem",    icon: Image },
-  { value: "video",    label: "Vídeo",     icon: FileVideo },
-  { value: "audio",    label: "Áudio",     icon: Mic },
-  { value: "document", label: "Documento", icon: File },
+  { value: "text",     label: "Texto",      icon: FileText,       simple: true,  body: true },
+  { value: "image",    label: "Imagem",     icon: Image,          simple: true,  body: true  },
+  { value: "video",    label: "Vídeo",      icon: FileVideo,      simple: true,  body: true  },
+  { value: "audio",    label: "Áudio",      icon: Mic,            simple: true,  body: false },
+  { value: "document", label: "Documento",  icon: File,           simple: true,  body: true  },
+  { value: "sticker",  label: "Sticker",    icon: Sticker,        simple: true,  body: false },
+  { value: "location", label: "Localização", icon: MapPin,        simple: false, body: false },
+  { value: "contact",  label: "Contato",    icon: Phone,          simple: false, body: false },
+  { value: "poll",     label: "Enquete",    icon: Vote,           simple: false, body: false },
+  { value: "buttons",  label: "Botões",     icon: MousePointer,   simple: false, body: true  },
+  { value: "list",     label: "Lista",      icon: ListTree,       simple: false, body: true  },
+  { value: "pix",      label: "PIX",        icon: Banknote,       simple: false, body: false },
+  { value: "template", label: "Template",   icon: LayoutTemplate, simple: false, body: false },
+  { value: "carousel", label: "Carrossel",  icon: GalleryHorizontalEnd, simple: false, body: false },
 ] as const;
 
 const ALL_HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -170,7 +186,7 @@ interface CampaignPrefill {
   name?: string;
   channel?: string;
   msgText?: string;
-  msgType?: "text" | "image" | "video" | "audio" | "document";
+  msgType?: typeof MSG_TYPES[number]["value"];
 }
 
 function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => void; onCreated: () => void; prefill?: CampaignPrefill }) {
@@ -192,7 +208,10 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const [audienceTab, setAudienceTab] = useState("crm");
   const [recipientsText, setRecipientsText] = useState("");
   const [csvFile, setCsvFile]             = useState<File | null>(null);
-  const [csvRecipients, setCsvRecipients] = useState<Array<{ phone: string; name: string }>>([]);
+  const [csvRecipients, setCsvRecipients] = useState<Array<{ phone: string; name: string; extra?: Record<string, string> }>>([]);
+  // Colunas detectadas do CSV pra alimentar o picker de variáveis
+  // dinamicamente (além das já-padronizadas phone/name).
+  const [csvColumns, setCsvColumns] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<Group[]>([]);
   const [groupSearch, setGroupSearch]       = useState("");
   const [groupSort, setGroupSort]           = useState<"name" | "members">("name");
@@ -242,7 +261,8 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const [igUsername, setIgUsername]   = useState("");
 
   // Step 5: Content
-  const [msgType, setMsgType]   = useState<"text" | "image" | "video" | "audio" | "document">(prefill?.msgType ?? "text");
+  type MsgType = typeof MSG_TYPES[number]["value"];
+  const [msgType, setMsgType] = useState<MsgType>(prefill?.msgType ?? "text");
   const [msgText, setMsgText]   = useState(prefill?.msgText ?? "");
   const [caption, setCaption]   = useState("");
   // Refs pra inserir variáveis Liquid na posição do cursor.
@@ -370,6 +390,27 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
+  // Variável picker → source + flags dinâmicas baseadas no audienceTab.
+  // Permite que o catálogo de variáveis reflita o que a campanha
+  // realmente vai ter disponível pra cada destinatário em tempo de
+  // render (sem hardcode).
+  type VarSource = "crm" | "csv" | "contacts" | "groups" | "followers" | "following" | "other";
+  const variableSource = useMemo<VarSource>(() => {
+    if (audienceTab === "crm") return "crm";
+    if (audienceTab === "csv") return "csv";
+    if (audienceTab === "contacts") return "contacts";
+    if (audienceTab === "groups") return "groups";
+    if (audienceTab === "followers") return "followers";
+    if (audienceTab === "following") return "following";
+    return "other";
+  }, [audienceTab]);
+
+  // Contatos colados podem vir como `<phone>,<nome>` — se pelo menos
+  // uma linha tem vírgula, expomos {{contact.name}} no picker.
+  const contactsHaveName = useMemo(() =>
+    recipientsText.split("\n").some((l) => l.includes(",")),
+  [recipientsText]);
+
   const parseContacts = useCallback(() =>
     recipientsText.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
       const [phone, ...rest] = l.split(",");
@@ -379,13 +420,53 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const handleCsvUpload = async (file: File) => {
     setCsvFile(file);
     const text = await file.text();
-    const lines = text.split("\n").slice(1); // skip header
-    const parsed = lines.map((l) => {
-      const [phone, name] = l.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
-      return { phone, name: name || "" };
-    }).filter((r) => r.phone);
+    const rawLines = text.replace(/^﻿/, "").split(/\r?\n/);
+    if (rawLines.length === 0) {
+      toast.error("CSV vazio");
+      return;
+    }
+    const splitRow = (s: string) =>
+      s.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const headerCols = splitRow(rawLines[0]).map((c) => c.toLowerCase());
+    if (!headerCols.length) {
+      toast.error("CSV sem cabeçalho");
+      return;
+    }
+    // Identifica a coluna de telefone (aceita "phone", "celular", "whatsapp",
+    // "numero", etc.) e a coluna de nome. Tudo o que sobrar vai pra extra.
+    const phoneAliases = ["phone", "telefone", "celular", "whatsapp", "numero", "número"];
+    const nameAliases = ["name", "nome", "first_name", "primeiro_nome", "contact_name"];
+    const phoneIdx = headerCols.findIndex((c) => phoneAliases.includes(c));
+    const nameIdx = headerCols.findIndex((c) => nameAliases.includes(c));
+    const extraIdxs: number[] = headerCols
+      .map((_, i) => i)
+      .filter((i) => i !== phoneIdx && i !== nameIdx);
+
+    const parsed = rawLines.slice(1)
+      .filter((l) => l.trim().length > 0)
+      .map((l) => {
+        const cols = splitRow(l);
+        const phone = phoneIdx >= 0 ? cols[phoneIdx] || "" : cols[0] || "";
+        const name = nameIdx >= 0 ? cols[nameIdx] || "" : "";
+        const extra: Record<string, string> = {};
+        for (const i of extraIdxs) {
+          const key = headerCols[i];
+          if (key && cols[i] !== undefined) extra[key] = cols[i];
+        }
+        return { phone, name, extra };
+      })
+      .filter((r) => r.phone);
+
+    const extraKeys = extraIdxs.map((i) => headerCols[i]).filter(Boolean);
     setCsvRecipients(parsed);
-    toast.success(`${parsed.length} contatos carregados do CSV`);
+    setCsvColumns(extraKeys);
+    if (extraKeys.length > 0) {
+      toast.success(
+        `${parsed.length} contatos · ${extraKeys.length} coluna(s) extra disponíveis como variável`,
+      );
+    } else {
+      toast.success(`${parsed.length} contatos carregados do CSV`);
+    }
   };
 
   // Gera e baixa um CSV template com header + 3 linhas de exemplo. UTF-8
@@ -447,7 +528,15 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const canNext5 = (() => {
     if (!needsContent) return true;
     if (isWABA) return !!selectedTpl && tplBodyVars.every((v) => (tplVars[v] || "").trim().length > 0) && (!tplHasMediaHeader || !!tplHeaderURL);
-    return msgType === "text" ? msgText.trim().length > 0 : !!mediaFile;
+    const typeDef = MSG_TYPES.find((t) => t.value === msgType);
+    // Tipos não-simples (location/contact/poll/pix/template/list/
+    // carousel) ainda não têm config dedicada no UI; permitimos avançar
+    // pra a próxima etapa e o backend trata como envio com placeholder.
+    // Quando a config específica entrar, validamos aqui.
+    if (!typeDef?.simple) return true;
+    if (msgType === "text") return msgText.trim().length > 0;
+    if (typeDef.body) return !!mediaFile; // mídia obrigatória
+    return !!mediaFile; // sticker / audio sem caption mas com arquivo
   })();
 
   const canNext = (s: number) => {
@@ -1259,7 +1348,14 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>Mensagem *</label>
-                        <VariableInsertButton textareaRef={msgTextRef} value={msgText} onChange={setMsgText} />
+                        <VariableInsertButton
+                          textareaRef={msgTextRef}
+                          value={msgText}
+                          onChange={setMsgText}
+                          source={variableSource}
+                          csvColumns={csvColumns}
+                          contactsHaveName={contactsHaveName}
+                        />
                       </div>
                       <textarea ref={msgTextRef} value={msgText} onChange={(e) => setMsgText(e.target.value)}
                         placeholder={"Digite a mensagem...\n\nDica: clique em \"Inserir variável\" pra personalizar com nome, email etc."}
@@ -1323,7 +1419,14 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>Legenda (opcional)</label>
-                        <VariableInsertButton textareaRef={captionRef} value={caption} onChange={setCaption} />
+                        <VariableInsertButton
+                          textareaRef={captionRef}
+                          value={caption}
+                          onChange={setCaption}
+                          source={variableSource}
+                          csvColumns={csvColumns}
+                          contactsHaveName={contactsHaveName}
+                        />
                       </div>
                       <textarea ref={captionRef} value={caption} onChange={(e) => setCaption(e.target.value)}
                         rows={2} className="input-field w-full resize-none" />
