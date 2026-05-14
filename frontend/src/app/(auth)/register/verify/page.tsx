@@ -190,7 +190,7 @@ function PhoneField({
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Celular</label>
       <div
-        className="grid grid-cols-[minmax(124px,150px)_1fr] rounded-xl border transition-all duration-150 bg-[hsl(240_18%_5%)]"
+        className="grid grid-cols-[92px_1fr] sm:grid-cols-[104px_1fr] rounded-xl border transition-all duration-150 bg-[hsl(240_18%_5%)]"
         style={{
           borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
           boxShadow: error
@@ -525,7 +525,16 @@ function CompleteForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // Pressionar Enter num input de step intermediário (ex: senha no
+    // step 2) submetia o form direto e disparava o registro/PIX antes
+    // do user chegar no passo de pagamento. Só registra de fato quando
+    // estamos no step final.
+    if (step < maxStep) {
+      nextStep();
+      return;
+    }
     if (!validateStep(2)) return;
+    if (isPaid && !validateStep(3)) return;
     setLoading(true);
     try {
       const res = await fetch(`${API}/v1/auth/register/complete`, {
@@ -1122,7 +1131,7 @@ function VerifyContent() {
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-sm flex flex-col gap-6 rounded-3xl p-6 sm:p-8"
+        className="relative w-full max-w-md flex flex-col gap-6 rounded-3xl p-6 sm:p-8"
         style={{
           background:
             "linear-gradient(160deg, rgba(20,24,40,0.78), rgba(12,14,24,0.78))",
