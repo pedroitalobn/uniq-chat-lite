@@ -2615,6 +2615,16 @@ export default function InstanceDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("geral");
   const [deleting, setDeleting] = useState(false);
   const [safetyDismissed, setSafetyDismissed] = useState(false);
+  const [safetyLogsOpen, setSafetyLogsOpen] = useState(false);
+
+  // Logs recentes carregados sob demanda quando o operador expande a
+  // seção dentro do modal de safety pause. Limitamos a 15 entries pra
+  // ficar legível dentro do modal sem precisar de scroll vertical longo.
+  const { data: safetyRecentLogs } = useQuery<{ data: InstanceEventLog[] }>({
+    queryKey: ["instance-event-logs-safety", params.id, safetyLogsOpen],
+    queryFn: () => instanceLogsApi.list(params.id as string, { limit: 15 }).then((r) => r.data),
+    enabled: safetyLogsOpen,
+  });
 
   const { data: instance, isLoading } = useQuery<Instance>({
     queryKey: ["instance", instanceId],
@@ -2789,6 +2799,63 @@ export default function InstanceDetailPage() {
               <p className="text-xs" style={{ color: "hsl(240 8% 52%)" }}>
                 Retomar reconecta a instância e limpa a pausa. Revisar mantém tudo pausado para você abrir logs, agentes e jornadas antes de religar.
               </p>
+
+              {/* Logs recentes — expansão sob demanda. Mostra os 15
+                 últimos eventos da instância dentro do próprio modal
+                 pra o operador ter contexto antes de decidir entre
+                 Revisar e Retomar sem precisar abrir outra aba. */}
+              <button
+                type="button"
+                onClick={() => setSafetyLogsOpen((v) => !v)}
+                className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded-lg transition-colors"
+                style={{
+                  background: safetyLogsOpen ? "var(--surface-2)" : "transparent",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-2)",
+                }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <FileText className="w-3 h-3" />
+                  Ver últimos eventos da instância
+                </span>
+                {safetyLogsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {safetyLogsOpen && (
+                <div
+                  className="rounded-lg max-h-56 overflow-y-auto divide-y"
+                  style={{
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border-default)",
+                    borderColor: "var(--border-default)",
+                  }}
+                >
+                  {!safetyRecentLogs ? (
+                    <p className="px-3 py-4 text-xs text-center" style={{ color: "var(--text-3)" }}>Carregando…</p>
+                  ) : safetyRecentLogs.data.length === 0 ? (
+                    <p className="px-3 py-4 text-xs text-center" style={{ color: "var(--text-3)" }}>Sem eventos recentes.</p>
+                  ) : (
+                    safetyRecentLogs.data.map((ev) => {
+                      const color = ev.level === "error" ? "#ef4444" : ev.level === "warn" ? "#f59e0b" : "var(--text-3)";
+                      return (
+                        <div key={ev.id} className="px-3 py-2 text-[11px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="uppercase tracking-wider font-semibold" style={{ color }}>
+                              {ev.level} · {ev.source}
+                            </span>
+                            <span style={{ color: "var(--text-4)" }}>
+                              {new Date(ev.created_at).toLocaleTimeString("pt-BR")}
+                            </span>
+                          </div>
+                          <p className="mt-0.5" style={{ color: "var(--text-1)" }}>{ev.event}</p>
+                          {ev.message && (
+                            <p className="mt-0.5 line-clamp-2" style={{ color: "var(--text-3)" }}>{ev.message}</p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
             <div className="p-4 flex flex-col sm:flex-row gap-2 justify-end" style={{ borderTop: "1px solid var(--border-default)" }}>
               <button
