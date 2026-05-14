@@ -79,10 +79,17 @@ func (h *AsaasHandler) apiRequest(method, endpoint string, body []byte) ([]byte,
 	return io.ReadAll(resp.Body)
 }
 
+// AsaasCustomerRequest — payload de POST /api/v3/customers. A API v3
+// espera o documento em "cpfCnpj" (aceita CPF ou CNPJ). Quando o
+// payload chega com a chave "cpf" o Asaas ignora silenciosamente e
+// depois falha a criação da cobrança com
+// "Para criar esta cobrança é necessário preencher o CPF ou CNPJ do
+// cliente.". mobilePhone também é exigido em vários fluxos PIX.
 type AsaasCustomerRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Cpf   string `json:"cpf,omitempty"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	CpfCnpj     string `json:"cpfCnpj,omitempty"`
+	MobilePhone string `json:"mobilePhone,omitempty"`
 }
 
 type AsaasCustomerResponse struct {
@@ -185,9 +192,10 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 			})
 		}
 		custReq := AsaasCustomerRequest{
-			Name:  user.Name,
-			Email: user.Email,
-			Cpf:   cpf,
+			Name:        user.Name,
+			Email:       user.Email,
+			CpfCnpj:     cpf,
+			MobilePhone: user.Phone,
 		}
 		custBody, _ := json.Marshal(custReq)
 		custResp, err := h.apiRequest("POST", "/api/v3/customers", custBody)
