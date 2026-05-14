@@ -494,13 +494,29 @@ function CompleteForm({
       if (password.length < 8) e.password = "Mínimo 8 caracteres";
       if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     }
+    if (nextStep === 3 && isPaid && asaasMethod === "credit_card") {
+      if (!card.holderName.trim()) e.cardHolder = "Nome no cartão é obrigatório";
+      const num = card.number.replace(/\D/g, "");
+      if (num.length < 13 || num.length > 19) e.cardNumber = "Número inválido";
+      const mm = parseInt(card.expiryMonth, 10);
+      if (!mm || mm < 1 || mm > 12) e.cardExpiry = "Validade inválida";
+      const yy = parseInt(card.expiryYear, 10);
+      if (!yy || (yy < 100 ? 2000 + yy : yy) < new Date().getFullYear()) e.cardExpiry = "Validade inválida";
+      if (card.cvv.length < 3) e.cardCvv = "CVV inválido";
+      if (!card.postalCode.trim()) e.cardZip = "CEP é obrigatório";
+      if (!card.addressNumber.trim()) e.cardAddrNum = "Número do endereço é obrigatório";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
+  // Última etapa: 3 quando plano é pago (precisa do passo de pagamento),
+  // 2 quando é grátis (só senha).
+  const maxStep = isPaid ? 3 : 2;
+
   function nextStep() {
     if (!validateStep(step)) return;
-    setStep((s) => Math.min(s + 1, 2));
+    setStep((s) => Math.min(s + 1, maxStep));
   }
 
   function prevStep() {
@@ -765,81 +781,6 @@ function CompleteForm({
             exit={{ opacity: 0, x: -16 }}
             className="flex flex-col gap-5"
           >
-            {isPaid && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium text-[hsl(240_15%_65%)]">Forma de pagamento</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {([
-                    { id: "pix_automatic", label: "PIX Automático", hint: "Autoriza 1x · débito mensal automático" },
-                    { id: "credit_card", label: "Cartão de crédito", hint: "Cobrança recorrente, sem QR mensal" },
-                  ] as const).map((opt) => {
-                    const active = asaasMethod === opt.id;
-                    return (
-                      <button
-                        type="button"
-                        key={opt.id}
-                        onClick={() => setAsaasMethod(opt.id)}
-                        className="rounded-xl p-3 text-left transition"
-                        style={{
-                          background: active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
-                          border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
-                          color: active ? "var(--green)" : "var(--text-2)",
-                        }}
-                      >
-                        <p className="text-sm font-semibold">{opt.label}</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{opt.hint}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-                {asaasMethod === "credit_card" && (
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <input
-                      type="text" placeholder="Nome no cartão"
-                      value={card.holderName}
-                      onChange={(e) => setCard((c) => ({ ...c, holderName: e.target.value }))}
-                      className="input-field text-xs col-span-2"
-                    />
-                    <input
-                      type="text" placeholder="Número do cartão" inputMode="numeric"
-                      value={card.number}
-                      onChange={(e) => setCard((c) => ({ ...c, number: e.target.value.replace(/[^\d ]/g, "") }))}
-                      className="input-field text-xs col-span-2"
-                    />
-                    <input
-                      type="text" placeholder="MM" inputMode="numeric" maxLength={2}
-                      value={card.expiryMonth}
-                      onChange={(e) => setCard((c) => ({ ...c, expiryMonth: e.target.value.replace(/\D/g, "") }))}
-                      className="input-field text-xs"
-                    />
-                    <input
-                      type="text" placeholder="AAAA" inputMode="numeric" maxLength={4}
-                      value={card.expiryYear}
-                      onChange={(e) => setCard((c) => ({ ...c, expiryYear: e.target.value.replace(/\D/g, "") }))}
-                      className="input-field text-xs"
-                    />
-                    <input
-                      type="text" placeholder="CVV" inputMode="numeric" maxLength={4}
-                      value={card.cvv}
-                      onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, "") }))}
-                      className="input-field text-xs col-span-2"
-                    />
-                    <input
-                      type="text" placeholder="CEP" inputMode="numeric"
-                      value={card.postalCode}
-                      onChange={(e) => setCard((c) => ({ ...c, postalCode: e.target.value }))}
-                      className="input-field text-xs"
-                    />
-                    <input
-                      type="text" placeholder="Número do endereço"
-                      value={card.addressNumber}
-                      onChange={(e) => setCard((c) => ({ ...c, addressNumber: e.target.value }))}
-                      className="input-field text-xs"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
             <div className="flex flex-col gap-2">
               <Field
                 label="Crie uma senha"
@@ -943,6 +884,170 @@ function CompleteForm({
             )}
           </motion.div>
         )}
+
+        {step === 3 && isPaid && (
+          <motion.div
+            key="step-3"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="flex flex-col gap-4"
+          >
+            {/* Resumo do plano + selo de segurança no topo */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="rounded-2xl p-4 flex items-center justify-between"
+              style={{
+                background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
+                border: "1px solid rgba(0,212,106,0.25)",
+              }}
+            >
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
+                  Plano selecionado
+                </p>
+                <p className="text-sm font-bold mt-0.5" style={{ color: "var(--text-1)" }}>
+                  {planLabel ?? "—"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Total mensal</p>
+                <p className="text-base font-bold" style={{ color: "var(--green)" }}>
+                  R$ {Number(planPriceVal ?? 0).toFixed(2).replace(".", ",")}
+                </p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-center justify-center gap-2 text-[11px]"
+              style={{ color: "var(--text-3)" }}
+            >
+              <Lock className="w-3 h-3" />
+              <span>Pagamento criptografado · processado pelo Asaas (PCI-DSS)</span>
+            </motion.div>
+
+            {/* Seletor de método */}
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: "pix_automatic", label: "PIX Automático", hint: "Autoriza 1x · débito mensal sem QR novo" },
+                { id: "credit_card", label: "Cartão de crédito", hint: "Tokenizado · cobrança recorrente" },
+              ] as const).map((opt) => {
+                const active = asaasMethod === opt.id;
+                return (
+                  <motion.button
+                    type="button"
+                    key={opt.id}
+                    onClick={() => setAsaasMethod(opt.id)}
+                    whileTap={{ scale: 0.98 }}
+                    className="rounded-xl p-3 text-left transition"
+                    style={{
+                      background: active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
+                      border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                      color: active ? "var(--green)" : "var(--text-2)",
+                    }}
+                  >
+                    <p className="text-sm font-semibold">{opt.label}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{opt.hint}</p>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Card preview animado + form (só pra cartão) */}
+            <AnimatePresence mode="wait">
+              {asaasMethod === "credit_card" ? (
+                <motion.div
+                  key="card-form"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                  className="flex flex-col gap-3"
+                >
+                  <AnimatedCardPreview card={card} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text" placeholder="Nome impresso no cartão"
+                      value={card.holderName}
+                      onChange={(e) => setCard((c) => ({ ...c, holderName: e.target.value.toUpperCase() }))}
+                      className="input-field text-xs col-span-2 uppercase"
+                    />
+                    <input
+                      type="text" placeholder="0000 0000 0000 0000" inputMode="numeric" maxLength={23}
+                      value={formatCardNumber(card.number)}
+                      onChange={(e) => setCard((c) => ({ ...c, number: e.target.value.replace(/\D/g, "").slice(0, 19) }))}
+                      className="input-field text-xs col-span-2 font-mono tracking-wider"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="MM" inputMode="numeric" maxLength={2}
+                        value={card.expiryMonth}
+                        onChange={(e) => setCard((c) => ({ ...c, expiryMonth: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                        className="input-field text-xs text-center font-mono" />
+                      <input type="text" placeholder="AAAA" inputMode="numeric" maxLength={4}
+                        value={card.expiryYear}
+                        onChange={(e) => setCard((c) => ({ ...c, expiryYear: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                        className="input-field text-xs text-center font-mono" />
+                    </div>
+                    <input
+                      type="text" placeholder="CVV" inputMode="numeric" maxLength={4}
+                      value={card.cvv}
+                      onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                      className="input-field text-xs text-center font-mono"
+                    />
+                    <input
+                      type="text" placeholder="CEP" inputMode="numeric"
+                      value={card.postalCode}
+                      onChange={(e) => setCard((c) => ({ ...c, postalCode: e.target.value }))}
+                      className="input-field text-xs"
+                    />
+                    <input
+                      type="text" placeholder="Número do endereço"
+                      value={card.addressNumber}
+                      onChange={(e) => setCard((c) => ({ ...c, addressNumber: e.target.value }))}
+                      className="input-field text-xs"
+                    />
+                  </div>
+                  {(errors.cardHolder || errors.cardNumber || errors.cardExpiry || errors.cardCvv || errors.cardZip || errors.cardAddrNum) && (
+                    <p className="text-[11px]" style={{ color: "#ef4444" }}>
+                      {errors.cardHolder || errors.cardNumber || errors.cardExpiry || errors.cardCvv || errors.cardZip || errors.cardAddrNum}
+                    </p>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="pix-info"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                  className="rounded-2xl p-4 text-xs"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}
+                >
+                  <p className="font-semibold mb-1" style={{ color: "var(--text-1)" }}>Como funciona o PIX Automático</p>
+                  <ol className="list-decimal pl-4 space-y-1" style={{ color: "var(--text-3)" }}>
+                    <li>Você paga 1 PIX agora, que já cobre a primeira mensalidade e autoriza o débito recorrente.</li>
+                    <li>Os meses seguintes são debitados automaticamente — sem QR novo, sem fatura manual.</li>
+                    <li>Pode cancelar quando quiser; revogar a autorização para o débito imediatamente.</li>
+                  </ol>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Selos de confiança */}
+            <div className="flex items-center justify-center gap-3 pt-1 text-[10px]" style={{ color: "var(--text-4)" }}>
+              <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> SSL/TLS</span>
+              <span>·</span>
+              <span>PCI-DSS</span>
+              <span>·</span>
+              <span>Asaas (BACEN)</span>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {errors.global && (
@@ -965,7 +1070,7 @@ function CompleteForm({
           </button>
         )}
 
-        {step < 2 ? (
+        {step < maxStep ? (
           <button
             type="button"
             onClick={nextStep}
@@ -974,7 +1079,7 @@ function CompleteForm({
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
           >
-            <span>Continuar</span><ArrowRight className="w-4 h-4" />
+            <span>{step === 2 && isPaid ? "Continuar para pagamento" : "Continuar"}</span><ArrowRight className="w-4 h-4" />
           </button>
         ) : (
           <button
@@ -987,7 +1092,12 @@ function CompleteForm({
           >
             {loading
               ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <><span>{isPaid ? "Continuar para pagamento" : "Criar conta"}</span><ArrowRight className="w-4 h-4" /></>}
+              : (
+                <>
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>{isPaid ? (asaasMethod === "credit_card" ? "Pagar com cartão" : "Gerar PIX e finalizar") : "Criar conta"}</span>
+                </>
+              )}
           </button>
         )}
       </div>
@@ -1154,5 +1264,113 @@ export default function RegisterVerifyPage() {
     <Suspense>
       <VerifyContent />
     </Suspense>
+  );
+}
+
+// formatCardNumber — insere espaços a cada 4 dígitos pra leitura. Aceita
+// só dígitos (caller já filtra). Amex (15 dígitos, prefix 34/37) usa
+// grupos 4-6-5; demais usam 4-4-4-4.
+function formatCardNumber(digits: string): string {
+  const d = digits.replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("34") || d.startsWith("37")) {
+    return [d.slice(0, 4), d.slice(4, 10), d.slice(10, 15)].filter(Boolean).join(" ");
+  }
+  const groups: string[] = [];
+  for (let i = 0; i < d.length; i += 4) groups.push(d.slice(i, i + 4));
+  return groups.join(" ");
+}
+
+// detectCardBrand — heurística simples por prefixo. Cobre as bandeiras
+// mais comuns no BR; "default" deixa o card sem logo (estético).
+function detectCardBrand(num: string): "visa" | "master" | "amex" | "elo" | "hipercard" | "default" {
+  const d = num.replace(/\D/g, "");
+  if (/^4/.test(d)) return "visa";
+  if (/^(5[1-5]|2[2-7])/.test(d)) return "master";
+  if (/^3[47]/.test(d)) return "amex";
+  if (/^(636368|438935|504175|451416|636297|5067|4576|4011|506699)/.test(d)) return "elo";
+  if (/^(606282|3841)/.test(d)) return "hipercard";
+  return "default";
+}
+
+// AnimatedCardPreview — visualização do cartão estilo Stripe Checkout
+// que reflete o que o user digita no form. Brilho gradiente em loop +
+// flip pra mostrar o CVV quando o usuário focar (eventual; deixamos
+// disponível mas sem trigger automático nessa iteração). Reduz a
+// sensação de "form solto sem contexto" que o operador relatou.
+function AnimatedCardPreview({ card }: { card: { holderName: string; number: string; expiryMonth: string; expiryYear: string; cvv: string } }) {
+  const brand = detectCardBrand(card.number);
+  const masked = (() => {
+    const d = card.number.replace(/\D/g, "");
+    if (!d) return "•••• •••• •••• ••••";
+    const padded = d.padEnd(16, "•");
+    return formatCardNumber(padded);
+  })();
+  const yy = (card.expiryYear || "AAAA").slice(-2);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, rotateX: 10 }}
+      animate={{ opacity: 1, rotateX: 0 }}
+      transition={{ type: "spring", stiffness: 200, damping: 18 }}
+      className="relative w-full rounded-2xl p-5 overflow-hidden"
+      style={{
+        aspectRatio: "1.586 / 1",
+        background: "linear-gradient(135deg, #0a1a14 0%, #0a3a25 45%, #145a3b 100%)",
+        boxShadow: "0 20px 50px rgba(0,212,106,0.18), 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
+        border: "1px solid rgba(0,212,106,0.25)",
+      }}
+    >
+      {/* Halo animado */}
+      <motion.div
+        className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(0,212,106,0.18) 0%, transparent 35%)",
+        }}
+        animate={{ rotate: [0, 360] }}
+        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+      />
+      {/* Chip dourado */}
+      <div
+        className="w-10 h-7 rounded-md mb-4 relative z-10"
+        style={{
+          background: "linear-gradient(135deg, #c8a35a, #e8c878 40%, #a0813f)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.3)",
+        }}
+      />
+      {/* Número */}
+      <p
+        className="font-mono text-base sm:text-lg tracking-wider relative z-10"
+        style={{ color: "rgba(255,255,255,0.95)", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}
+      >
+        {masked}
+      </p>
+      {/* Linha inferior */}
+      <div className="flex items-end justify-between mt-4 relative z-10">
+        <div>
+          <p className="text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Titular</p>
+          <p className="text-[11px] font-medium uppercase truncate max-w-[180px]" style={{ color: "rgba(255,255,255,0.92)" }}>
+            {card.holderName || "NOME NO CARTÃO"}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Validade</p>
+          <p className="text-[11px] font-mono font-medium" style={{ color: "rgba(255,255,255,0.92)" }}>
+            {(card.expiryMonth || "MM").padStart(2, "0").slice(0, 2)}/{yy}
+          </p>
+        </div>
+        <div
+          className="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
+          style={{
+            background: "rgba(255,255,255,0.10)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "rgba(255,255,255,0.92)",
+            letterSpacing: "0.05em",
+          }}
+        >
+          {brand === "default" ? "CARD" : brand.toUpperCase()}
+        </div>
+      </div>
+    </motion.div>
   );
 }
