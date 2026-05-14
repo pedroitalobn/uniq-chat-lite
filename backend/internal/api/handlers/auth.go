@@ -1803,10 +1803,16 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			// + 1ª parcela); os meses 2+ são gerados pelo cron
 			// AsaasPixAutoCron via /api/v3/payments com
 			// pixAutomaticAuthorizationId.
+			// contractId — Asaas exige identificador único do contrato no
+			// lado do merchant. Usamos pending+plan pra que reexecução do
+			// signup pra mesma sessão reidentifique o mesmo contrato (sem
+			// criar duplicados se o user clicar duas vezes).
+			contractID := "uniq-" + pending.ID.String() + "-" + plan.ID.String()
 			authReq := AsaasPixAutomaticAuthRequest{
 				Customer:          customerID,
 				Value:             plan.Price,
 				Frequency:         "MONTHLY",
+				ContractID:        contractID,
 				Cycle:             "MONTHLY",
 				NextDueDate:       time.Now().Format("2006-01-02"),
 				Description:       "Assinatura " + plan.Name + " — Uniq Chat",

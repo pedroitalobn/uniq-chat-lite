@@ -583,9 +583,10 @@ func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 type AsaasPixAutomaticAuthRequest struct {
 	Customer          string  `json:"customer"`
 	Value             float64 `json:"value"`
-	Frequency         string  `json:"frequency"`         // OBRIGATÓRIO — MONTHLY | WEEKLY | DAILY etc.
-	Cycle             string  `json:"cycle,omitempty"`   // legacy, mantido por compatibilidade
-	NextDueDate       string  `json:"nextDueDate"`       // YYYY-MM-DD do primeiro charge
+	Frequency         string  `json:"frequency"`            // OBRIGATÓRIO — MONTHLY | WEEKLY | etc.
+	ContractID        string  `json:"contractId"`           // OBRIGATÓRIO — identificador único do contrato no merchant
+	Cycle             string  `json:"cycle,omitempty"`      // legacy, mantido por compatibilidade
+	NextDueDate       string  `json:"nextDueDate"`          // YYYY-MM-DD do primeiro charge
 	ExpirationDate    string  `json:"expirationDate,omitempty"`
 	Description       string  `json:"description,omitempty"`
 	ExternalReference string  `json:"externalReference,omitempty"`
