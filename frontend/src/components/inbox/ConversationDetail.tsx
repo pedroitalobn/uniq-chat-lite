@@ -1458,7 +1458,7 @@ function MessageBubble({
       <>
       <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
         <div
-          className="relative max-w-[80%] uniq-slide-up"
+          className="relative max-w-[min(80%,52ch)] min-w-[80px] uniq-slide-up"
           style={
             isAudioOnly
               ? undefined
@@ -1546,7 +1546,7 @@ function MessageBubble({
     <>
     <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className="relative max-w-[80%] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
+        className="relative max-w-[min(80%,52ch)] min-w-[80px] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
         style={
           isOut
             ? {
@@ -2609,12 +2609,19 @@ function MessageActionsToolbar({
   const QUICK_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
   return (
     <div
-      className={`pointer-events-none absolute -top-3.5 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
-        isOut ? "right-2" : "left-2"
+      // Posicionamento adaptativo: ancorado dentro da bolha, com max-width
+      // limitado à própria coluna, flex-wrap permitido. Antes a barra
+      // estendia-se com largura natural fora do bubble pra fora da
+      // coluna; em colunas estreitas (split de 3 colunas no inbox) ela
+      // ficava cortada / atrás do split adjacente. Agora ela se
+      // contrai/quebra linha dentro do espaço disponível.
+      className={`pointer-events-none absolute -top-3 z-30 flex flex-wrap items-center gap-0 rounded-full px-0.5 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
+        isOut ? "right-0" : "left-0"
       }`}
       style={{
         background: "var(--surface-solid)",
         border: "1px solid var(--border)",
+        maxWidth: "calc(100% - 8px)",
       }}
     >
       {onReact && (
@@ -2622,7 +2629,7 @@ function MessageActionsToolbar({
           <button
             type="button"
             onClick={() => setEmojiOpen((v) => !v)}
-            className="rounded-full p-1 hover:bg-white/10"
+            className="rounded-full p-0.5 hover:bg-white/10"
             title="Reagir"
             style={{ color: "hsl(240 8% 62%)" }}
           >
@@ -2657,7 +2664,7 @@ function MessageActionsToolbar({
         <button
           type="button"
           onClick={() => onReply(m)}
-          className="rounded-full p-1 hover:bg-white/10"
+          className="rounded-full p-0.5 hover:bg-white/10"
           title="Responder"
           style={{ color: "hsl(240 8% 62%)" }}
         >
@@ -2668,7 +2675,7 @@ function MessageActionsToolbar({
         <button
           type="button"
           onClick={() => onForward(m)}
-          className="rounded-full p-1 hover:bg-white/10"
+          className="rounded-full p-0.5 hover:bg-white/10"
           title="Encaminhar"
           style={{ color: "hsl(240 8% 62%)" }}
         >
@@ -2679,7 +2686,7 @@ function MessageActionsToolbar({
         <button
           type="button"
           onClick={() => onEdit!(m)}
-          className="rounded-full p-1 hover:bg-white/10"
+          className="rounded-full p-0.5 hover:bg-white/10"
           title="Editar"
           style={{ color: "hsl(240 8% 62%)" }}
         >
@@ -2691,7 +2698,7 @@ function MessageActionsToolbar({
           <button
             type="button"
             onClick={() => onPatch({ is_pinned: !m.is_pinned })}
-            className="rounded-full p-1 hover:bg-white/10"
+            className="rounded-full p-0.5 hover:bg-white/10"
             title={m.is_pinned ? "Desfixar" : "Fixar"}
             style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
           >
@@ -2700,7 +2707,7 @@ function MessageActionsToolbar({
           <button
             type="button"
             onClick={() => onPatch({ is_favorite: !m.is_favorite })}
-            className="rounded-full p-1 hover:bg-white/10"
+            className="rounded-full p-0.5 hover:bg-white/10"
             title={m.is_favorite ? "Remover favorito" : "Favoritar"}
             style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
           >
@@ -2712,7 +2719,7 @@ function MessageActionsToolbar({
         <button
           type="button"
           onClick={() => onInfo(m)}
-          className="rounded-full p-1 hover:bg-white/10"
+          className="rounded-full p-0.5 hover:bg-white/10"
           title="Informações da mensagem"
           style={{ color: "hsl(240 8% 62%)" }}
         >
@@ -2723,7 +2730,7 @@ function MessageActionsToolbar({
         <button
           type="button"
           onClick={() => onRevoke!(m)}
-          className="rounded-full p-1 hover:bg-red-500/20"
+          className="rounded-full p-0.5 hover:bg-red-500/20"
           title="Apagar mensagem"
           style={{ color: "#ef4444" }}
         >
