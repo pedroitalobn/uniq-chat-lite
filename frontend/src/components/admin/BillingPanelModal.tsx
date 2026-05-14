@@ -225,7 +225,7 @@ function ServicesTab({ userId, provider }: { userId: string; provider: string })
   const qc = useQueryClient();
   const listQ = useQuery<{ data: ServiceCharge[] }>({
     queryKey: ["admin-billing-services", userId],
-    queryFn: () => adminApi.billingListServices(userId),
+    queryFn: () => adminApi.billingListServices(userId).then((r) => r.data),
   });
   const [form, setForm] = useState({
     name: "", description: "", amount: "", recurring_cycle: "", send_email: true,
@@ -237,7 +237,7 @@ function ServicesTab({ userId, provider }: { userId: string; provider: string })
       amount: Number(form.amount),
       recurring_cycle: form.recurring_cycle || undefined,
       send_email: form.send_email,
-    }),
+    }).then((r) => r.data as { warning?: string; url?: string }),
     onSuccess: (r: { warning?: string; url?: string }) => {
       if (r.warning) toast.warning(r.warning);
       else toast.success(r.url ? "Cobrança criada e link gerado" : "Cobrança criada");
@@ -350,7 +350,7 @@ function CheckoutLinkTab({ userId }: { userId: string }) {
       charge_type: form.charge_type,
       subscription_cycle: form.charge_type === "RECURRENT" ? form.subscription_cycle : undefined,
       send_email: form.send_email,
-    }),
+    }).then((r) => r.data as { url: string; checkout_id: string; emailed: boolean }),
     onSuccess: (r: { url: string; checkout_id: string; emailed: boolean }) => {
       setResult(r);
       toast.success(r.emailed ? "Link enviado por email" : "Link gerado");
@@ -452,7 +452,7 @@ function CustomInvoiceTab({ userId }: { userId: string }) {
       description: form.description || undefined,
       due_date: form.due_date || undefined,
       billing_type: form.billing_type,
-    }),
+    }).then((r) => r.data as { invoice_url: string; payment_id: string }),
     onSuccess: (r: { invoice_url: string; payment_id: string }) => {
       setResult(r);
       toast.success("Fatura criada");
