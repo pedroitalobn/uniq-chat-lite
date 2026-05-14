@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -44,6 +45,23 @@ func (h *AsaasHandler) getWebhookSecret() string {
 		return settings.AsaasWebhookSecret
 	}
 	return config.AppConfig.AsaasWebhookSecret
+}
+
+// getAPIBaseURL — host alternativo usado pelos endpoints mais novos do
+// Asaas (PIX Automático, e provavelmente o que se torna padrão).
+// Formato: api[-sandbox].asaas.com, path /v3/... (sem o /api/ prefix).
+// Mantemos o getBaseURL legado funcionando pra não quebrar o fluxo
+// atual de subscriptions e customers que usa /api/v3/...
+func (h *AsaasHandler) getAPIBaseURL() string {
+	var settings models.PaymentSettings
+	env := config.AppConfig.AsaasEnvironment
+	if err := h.db.First(&settings).Error; err == nil && settings.AsaasEnvironment != "" {
+		env = settings.AsaasEnvironment
+	}
+	if env == "production" {
+		return "https://api.asaas.com"
+	}
+	return "https://api-sandbox.asaas.com"
 }
 
 func (h *AsaasHandler) getBaseURL() string {
@@ -487,4 +505,171 @@ func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar planos"})
 	}
 	return c.JSON(plans)
+}
+
+// ─── PIX Automático ──────────────────────────────────────────────────────
+// Endpoint novo (host api[-sandbox].asaas.com, path /v3/pix/automatic/...).
+// Fluxo: o cliente paga UMA vez o immediateQrCode da autorização, o que
+// debita o primeiro mês E captura o consentimento de débito recorrente.
+// Próximas cobranças são criadas via /v3/payments com pixAutomaticAuthorizationId
+// e Asaas debita automático (sem QR novo, sem ação do cliente).
+
+// AsaasPixAutomaticAuthRequest — payload de criação da autorização.
+// Campos derivados do padrão Asaas (subscription + pix). Ajustar se o
+// sandbox indicar divergência (ex: campo extra obrigatório).
+type AsaasPixAutomaticAuthRequest struct {
+	Customer          string  `json:"customer"`
+	Value             float64 `json:"value"`
+	Cycle             string  `json:"cycle"`             // MONTHLY | WEEKLY | etc.
+	NextDueDate       string  `json:"nextDueDate"`       // YYYY-MM-DD do primeiro charge
+	ExpirationDate    string  `json:"expirationDate,omitempty"`
+	Description       string  `json:"description,omitempty"`
+	ExternalReference string  `json:"externalReference,omitempty"`
+}
+
+// AsaasPixAutomaticAuthResponse — resposta da criação. O cliente paga
+// ImmediateQrCode (payload PIX copia-e-cola + imagem base64). ID e
+// ConciliationIdentifier ficam guardados pra cobranças futuras.
+type AsaasPixAutomaticAuthResponse struct {
+	ID              string                       `json:"id"`
+	Status          string                       `json:"status"`
+	Customer        string                       `json:"customer"`
+	Value           float64                      `json:"value"`
+	Cycle           string                       `json:"cycle"`
+	NextDueDate     string                       `json:"nextDueDate"`
+	ExpirationDate  string                       `json:"expirationDate,omitempty"`
+	ImmediateQrCode *AsaasPixAutomaticImmediate  `json:"immediateQrCode,omitempty"`
+}
+
+type AsaasPixAutomaticImmediate struct {
+	// Conteúdo PIX copia-e-cola (BR Code). Frontend renderiza como QR
+	// e também como texto pra copiar.
+	Payload string `json:"payload"`
+	// EncodedImage — base64 do PNG do QR (opcional; nem todos retornam).
+	EncodedImage         string `json:"encodedImage,omitempty"`
+	ExpirationDate       string `json:"expirationDate,omitempty"`
+	ConciliationIdentifier string `json:"conciliationIdentifier,omitempty"`
+}
+
+// CreatePixAutomaticAuthorization — cria a autorização no endpoint novo
+// (POST /v3/pix/automatic/authorizations no host api.asaas.com).
+// Devolve o body parseado + os bytes crus (pra log/diagnóstico em caso
+// de erro do Asaas).
+func (h *AsaasHandler) CreatePixAutomaticAuthorization(reqPayload AsaasPixAutomaticAuthRequest) (*AsaasPixAutomaticAuthResponse, []byte, error) {
+	body, _ := json.Marshal(reqPayload)
+	url := h.getAPIBaseURL() + "/v3/pix/automatic/authorizations"
+
+	httpReq, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("access_token", h.getAPIKey())
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 400 {
+		return nil, raw, fmt.Errorf("asaas pix-automatic auth HTTP %d", resp.StatusCode)
+	}
+	var out AsaasPixAutomaticAuthResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, raw, err
+	}
+	return &out, raw, nil
+}
+
+// ─── Asaas Checkout ──────────────────────────────────────────────────────
+// POST /v3/checkouts cria uma sessão hospedada que aceita 1+ formas de
+// pagamento e suporta charge RECURRENT. O cliente é redirecionado pra
+// uma página Asaas onde escolhe PIX ou cartão. Use-case: o operador
+// configura asaas_checkout_type=redirect e ainda assim quer oferecer
+// PIX automático + cartão num só fluxo.
+
+type AsaasCheckoutItem struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	Quantity    int     `json:"quantity"`
+	Value       float64 `json:"value"`
+}
+
+type AsaasCheckoutCustomerData struct {
+	Name          string `json:"name,omitempty"`
+	CpfCnpj       string `json:"cpfCnpj,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
+	Address       string `json:"address,omitempty"`
+	AddressNumber string `json:"addressNumber,omitempty"`
+	Complement    string `json:"complement,omitempty"`
+	PostalCode    string `json:"postalCode,omitempty"`
+	Province      string `json:"province,omitempty"`
+}
+
+type AsaasCheckoutCallback struct {
+	SuccessUrl string `json:"successUrl,omitempty"`
+	CancelUrl  string `json:"cancelUrl,omitempty"`
+}
+
+// AsaasCheckoutRequest — payload do POST /v3/checkouts. Aceita lista de
+// billing types (Asaas oferece o picker na página) e chargeTypes —
+// quando RECURRENT está incluído e PIX é uma das opções, o checkout
+// usa PIX Automático automaticamente (consentimento + débitos futuros).
+type AsaasCheckoutRequest struct {
+	BillingTypes      []string                   `json:"billingTypes"`
+	ChargeTypes       []string                   `json:"chargeTypes"`
+	Customer          string                     `json:"customer,omitempty"`
+	CustomerData      *AsaasCheckoutCustomerData `json:"customerData,omitempty"`
+	Items             []AsaasCheckoutItem        `json:"items"`
+	SubscriptionCycle string                     `json:"subscriptionCycle,omitempty"`
+	DueDateLimitDays  int                        `json:"dueDateLimitDays,omitempty"`
+	Callback          *AsaasCheckoutCallback     `json:"callback,omitempty"`
+	ExternalReference string                     `json:"externalReference,omitempty"`
+}
+
+type AsaasCheckoutResponse struct {
+	ID     string `json:"id"`
+	Link   string `json:"link,omitempty"`
+	URL    string `json:"url,omitempty"`
+	Status string `json:"status,omitempty"`
+}
+
+// CreateAsaasCheckout — POST /v3/checkouts no host api.asaas.com. Não
+// reusa o apiRequest legado porque o path é /v3/... (sem /api/) e o
+// host muda pra api[-sandbox].asaas.com.
+func (h *AsaasHandler) CreateAsaasCheckout(reqPayload AsaasCheckoutRequest) (*AsaasCheckoutResponse, []byte, error) {
+	body, _ := json.Marshal(reqPayload)
+	url := h.getAPIBaseURL() + "/v3/checkouts"
+
+	httpReq, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("access_token", h.getAPIKey())
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 400 {
+		return nil, raw, fmt.Errorf("asaas checkout HTTP %d", resp.StatusCode)
+	}
+	var out AsaasCheckoutResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, raw, err
+	}
+	// Asaas pode devolver "link" OU "url" dependendo da versão.
+	if out.URL == "" && out.Link != "" {
+		out.URL = out.Link
+	}
+	return &out, raw, nil
 }
