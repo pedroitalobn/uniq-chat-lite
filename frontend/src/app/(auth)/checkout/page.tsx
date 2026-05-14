@@ -37,6 +37,13 @@ function CheckoutContent() {
   const providerFromUrl = searchParams.get("provider");
   const subscriptionId = searchParams.get("subscription_id");
   const firstInvoiceUrl = searchParams.get("first_invoice_url");
+  // PIX Automático — vem do /register/verify quando o user escolhe PIX
+  // Auto. Trazemos o br_code + base64 direto pela URL pra a página
+  // renderizar o QR sem nova chamada de API.
+  const urlMode = searchParams.get("mode");
+  const urlBrCode = searchParams.get("br_code");
+  const urlBrCodeBase64 = searchParams.get("br_code_base64");
+  const urlAuthorizationId = searchParams.get("authorization_id");
 
   // For old flow
   const planId = searchParams.get("plan_id");
@@ -44,6 +51,7 @@ function CheckoutContent() {
 
   const isTransparentCheckout = !!clientSecret;
   const isAsaasSubscription = !!subscriptionId;
+  const isPixAutomatic = urlMode === "pix_automatic" && !!urlBrCode;
   const isAbacatePay = provider === "abacatepay";
   const hasBrCode = !!checkoutData?.br_code && !checkoutData?.payment_link;
   const hasPaymentLink = !!checkoutData?.payment_link;
@@ -94,7 +102,21 @@ function CheckoutContent() {
   }, [hasBrCode, isAsaasSubscription, pendingId, paymentIntentId, subscriptionId, pollingPayment, pixTimeLeft, router]);
 
   useEffect(() => {
-    if (isTransparentCheckout) {
+    if (isPixAutomatic) {
+      // /register/verify nos passou o br_code da autorização. Renderizamos
+      // QR + copia-e-cola inline (não precisa nova chamada de API).
+      setCheckoutData({
+        checkout_type: "pix_automatic",
+        plan_name: planName || "Plano",
+        plan_price: parseFloat(planPrice || "0"),
+        br_code: urlBrCode,
+        br_code_base64: urlBrCodeBase64 || "",
+        authorization_id: urlAuthorizationId,
+        provider: "asaas",
+      });
+      setStep("checkout");
+      setLoading(false);
+    } else if (isTransparentCheckout) {
       setCheckoutData({
         checkout_type: "transparent",
         plan_name: planName || "Plano",
@@ -270,7 +292,15 @@ function CheckoutContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "hsl(240 12% 6%)" }}>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(1200px 600px at 20% 0%, rgba(0,212,106,0.18), transparent 60%)," +
+          "radial-gradient(900px 500px at 100% 100%, rgba(99,102,241,0.16), transparent 65%)," +
+          "linear-gradient(180deg, hsl(240 22% 3%) 0%, hsl(240 18% 4%) 50%, hsl(240 22% 3%) 100%)",
+      }}
+    >
       {/* Animated background orbs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
