@@ -1563,6 +1563,58 @@ function PixQrInlineView({
       >
         Trocar método de pagamento
       </button>
+
+      <PoweredBy provider="asaas" />
     </motion.div>
+  );
+}
+
+// PROVIDER_LOGOS — catálogo dos provedores de pagamento que a Uniq
+// integra. Cada um traz o nome de exibição + a URL do logo
+// (preferimos SVG hospedado pelo próprio provider pra ficar sempre
+// atualizado). Como vamos rotacionar provider (Asaas hoje, Abacatepay
+// amanhã), a UI consulta esse mapa em vez de hardcodar "Asaas".
+const PROVIDER_LOGOS: Record<string, { name: string; logo: string }> = {
+  asaas: {
+    name: "Asaas",
+    logo: "https://www.asaas.com/assets/logo/asaas-blue-only-icon-9fe98aa6050e814a9ecb83a819109bed.svg",
+  },
+  abacatepay: {
+    name: "AbacatePay",
+    logo: "https://www.abacatepay.com/_next/static/media/logo.b7d11a52.svg",
+  },
+  stripe: {
+    name: "Stripe",
+    logo: "https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg",
+  },
+};
+
+// PoweredBy — selo "Powered by <Logo> <Name>" no rodapé das telas de
+// pagamento. Dinâmico pelo provider atual; se vier um nome
+// desconhecido, fica só com o texto.
+function PoweredBy({ provider }: { provider: string }) {
+  const info = PROVIDER_LOGOS[provider.toLowerCase()];
+  if (!info) {
+    return (
+      <p className="text-[10px] text-center pt-2" style={{ color: "var(--text-4)" }}>
+        Powered by {provider}
+      </p>
+    );
+  }
+  return (
+    <div
+      className="flex items-center justify-center gap-1.5 pt-2 text-[10px]"
+      style={{ color: "var(--text-4)" }}
+    >
+      <span>Powered by</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={info.logo}
+        alt={info.name}
+        className="h-3.5 w-auto opacity-80"
+        loading="lazy"
+      />
+      <span style={{ color: "var(--text-3)" }}>{info.name}</span>
+    </div>
   );
 }
