@@ -56,7 +56,7 @@ export function QuickActionMenu({
     if (!open || !anchor) return;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const menuW = 240;
+    const menuW = 280;
     // Estima altura: 52px por item + padding. Ajusta com ref após mount.
     const estimatedH = items.length * 52 + (preview ? 76 : 16);
     let left = anchor.x - menuW / 2;
@@ -101,7 +101,7 @@ export function QuickActionMenu({
             style={{
               left: pos.left,
               top: pos.top,
-              width: 240,
+              width: 280,
               background: "rgba(20,20,30,0.96)",
               backdropFilter: "blur(28px) saturate(200%)",
               WebkitBackdropFilter: "blur(28px) saturate(200%)",
@@ -144,7 +144,7 @@ export function QuickActionMenu({
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{item.label}</div>
+                    <div className="text-sm font-medium leading-tight">{item.label}</div>
                     {item.hint && (
                       <div className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
                         {item.hint}
