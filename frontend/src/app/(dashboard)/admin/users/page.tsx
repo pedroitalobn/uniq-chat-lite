@@ -6,7 +6,7 @@ import { adminApi } from "@/lib/api";
 import {
   Users, Shield, User as UserIcon, Trash2, Ban, CheckCircle2,
   Loader2, Plus, X, Eye, EyeOff, Clock, Search, RotateCcw,
-  ChevronDown, Lock, Ticket, CreditCard, Copy, Mail, ExternalLink,
+  ChevronDown, Lock, Ticket, CreditCard, Copy, Mail, ExternalLink, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { User, Plan, UserRole } from "@/types";
 import { useState, useEffect } from "react";
 import { BillingLinkModal } from "@/components/admin/BillingLinkModal";
+import { BillingPanelModal } from "@/components/admin/BillingPanelModal";
 
 // ─── Create User Modal ────────────────────────────────────────────────────────
 function CreateUserModal({ plans, onClose, onCreated }: {
@@ -368,6 +369,7 @@ export default function AdminUsersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [resetUser, setResetUser]   = useState<User | null>(null);
   const [billingUser, setBillingUser] = useState<User | null>(null);
+  const [billingPanelUser, setBillingPanelUser] = useState<User | null>(null);
   const [blockUser, setBlockUser]   = useState<User | null>(null);
   const [actionId, setActionId]     = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -719,6 +721,15 @@ export default function AdminUsersPage() {
                         onClick={(e) => { e.stopPropagation(); setBillingUser(user); }}
                       />
 
+                      {/* Billing avançado — overview + cobranças avulsas +
+                          fatura personalizada + refund + link de pagamento */}
+                      <ActionBtn
+                        icon={<DollarSign className="w-3.5 h-3.5" />}
+                        label="Billing avançado"
+                        color="var(--green)"
+                        onClick={(e) => { e.stopPropagation(); setBillingPanelUser(user); }}
+                      />
+
                       {/* Block / Unblock */}
                       {blocked ? (
                         <ActionBtn
@@ -765,6 +776,7 @@ export default function AdminUsersPage() {
       )}
       {resetUser && <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />}
       {billingUser && <BillingLinkModal user={billingUser} onClose={() => setBillingUser(null)} />}
+      {billingPanelUser && <BillingPanelModal user={billingPanelUser} onClose={() => setBillingPanelUser(null)} />}
       {blockUser && <BlockModal user={blockUser} onClose={() => setBlockUser(null)} onConfirm={handleBlock} />}
     </div>
   );

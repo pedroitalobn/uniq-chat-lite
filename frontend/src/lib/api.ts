@@ -1648,6 +1648,30 @@ export const adminApi = {
   getCommunicationSettings: () => api.get("/v1/admin/communication-settings"),
   updateCommunicationSettings: (data: Record<string, unknown>) =>
     api.put("/v1/admin/communication-settings", data),
+
+  // Billing panel — endpoints novos de admin_billing.go
+  billingOverview: (id: string) => api.get(`/v1/admin/users/${id}/billing/overview`),
+  billingCustomInvoice: (id: string, data: {
+    value: number; description?: string; due_date?: string; billing_type?: string;
+  }) => api.post(`/v1/admin/users/${id}/billing/custom-invoice`, data),
+  billingToggleOverage: (id: string, allow: boolean) =>
+    api.patch(`/v1/admin/users/${id}/billing/overage`, { allow }),
+  billingRefund: (id: string, data: { payment_id: string; value?: number; description?: string }) =>
+    api.post(`/v1/admin/users/${id}/billing/refund`, data),
+  billingCheckoutLink: (id: string, data: {
+    value: number; description?: string; plan_name?: string;
+    charge_type?: "DETACHED" | "RECURRENT"; subscription_cycle?: string;
+    send_email?: boolean; copy_only?: boolean;
+  }) => api.post(`/v1/admin/users/${id}/billing/checkout-link`, data),
+  billingSendLink: (id: string, data: { url: string; subject?: string; message?: string }) =>
+    api.post(`/v1/admin/users/${id}/billing/send-link`, data),
+  billingListServices: (id: string) => api.get(`/v1/admin/users/${id}/billing/services`),
+  billingCreateService: (id: string, data: {
+    name: string; description?: string; amount: number; currency?: string;
+    category?: string; recurring_cycle?: string; send_email?: boolean; provider?: string;
+  }) => api.post(`/v1/admin/users/${id}/billing/services`, data),
+  billingCancelService: (id: string, chargeId: string) =>
+    api.post(`/v1/admin/users/${id}/billing/services/${chargeId}/cancel`),
 };
 
 export const plansApi = {
