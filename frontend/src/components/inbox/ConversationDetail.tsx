@@ -1458,7 +1458,7 @@ function MessageBubble({
       <>
       <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
         <div
-          className="relative max-w-[min(80%,52ch)] min-w-[80px] uniq-slide-up"
+          className="relative max-w-[min(72%,40ch)] min-w-[96px] uniq-slide-up"
           style={
             isAudioOnly
               ? undefined
@@ -1546,7 +1546,7 @@ function MessageBubble({
     <>
     <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className="relative max-w-[min(80%,52ch)] min-w-[80px] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
+        className="relative max-w-[min(72%,40ch)] min-w-[96px] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
         style={
           isOut
             ? {
@@ -2609,16 +2609,23 @@ function MessageActionsToolbar({
   const QUICK_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
   return (
     <div
-      // Posicionamento adaptativo: ancorado dentro da bolha, com max-width
-      // limitado à própria coluna, flex-wrap permitido. Antes a barra
-      // estendia-se com largura natural fora do bubble pra fora da
-      // coluna; em colunas estreitas (split de 3 colunas no inbox) ela
-      // ficava cortada / atrás do split adjacente. Agora ela se
-      // contrai/quebra linha dentro do espaço disponível.
-      className={`pointer-events-none absolute -top-3 z-30 flex flex-wrap items-center gap-0 rounded-full px-0.5 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
-        isOut ? "right-0" : "left-0"
+      // Toolbar agora vive DENTRO da bolha (no canto superior), nunca
+      // projeta pra fora. Antes ela ficava em -top-3 e qualquer ancestor
+      // com overflow auto/hidden (timeline, painel, coluna estreita)
+      // cortava ela quando a bolha estava perto da borda do scroll.
+      // Posicionada com -top-2 + inset horizontal de 4px e max-width
+      // calc(100% - 8px) — tudo dentro do bounding box visual da bolha.
+      className={`pointer-events-none absolute top-1 z-30 flex flex-wrap items-center gap-0 rounded-full px-0.5 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
+        isOut ? "right-1" : "left-1"
       }`}
       style={{
+        // Toolbar fica DENTRO do bubble agora (top-1 + right-1/left-1),
+        // nunca projeta pra fora. Qualquer ancestor com overflow auto
+        // (scroll do timeline, painel split lateral, modal) cortava a
+        // toolbar quando ela ficava em -top-3 e o bubble estava perto
+        // da borda visível. Como ela está dentro do bubble agora ela
+        // pode sobrepor a primeira linha de texto durante o hover —
+        // tradeoff aceitável pra garantir visibilidade total.
         background: "var(--surface-solid)",
         border: "1px solid var(--border)",
         maxWidth: "calc(100% - 8px)",
