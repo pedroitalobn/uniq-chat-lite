@@ -40,11 +40,11 @@
 
     /* Brand */
     --green: #2563EB;
-    --green-strong: #00ff7f;
+    --green-strong: #60A5FA;
     --green-soft: rgba(37, 99, 235, 0.12);
     --green-dim: rgba(37, 99, 235, 0.08);
     --green-border: rgba(37, 99, 235, 0.22);
-    --green-fg: #03170a; /* texto sobre o verde */
+    --green-fg: #ffffff;
 
     /* Surface ladder — com alpha pra deixar o gradient mesh vazar e dar
        profundidade ao glass morphism. hsl puro = opaco = mata o efeito. */
@@ -127,11 +127,11 @@
     --input: 30 12% 96%;
     --ring: 148 80% 32%;
 
-    --green: #009a4e;
+    --green: #2563EB;
     --green-strong: #1D4ED8;
-    --green-soft: rgba(0, 154, 78, 0.12);
-    --green-dim: rgba(0, 154, 78, 0.06);
-    --green-border: rgba(0, 154, 78, 0.25);
+    --green-soft: rgba(37, 99, 235, 0.12);
+    --green-dim: rgba(37, 99, 235, 0.06);
+    --green-border: rgba(37, 99, 235, 0.25);
     --green-fg: #ffffff;
 
     /* Surface ladder light — 4 níveis (Mintlify+Wise warmth) */
