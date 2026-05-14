@@ -14,10 +14,10 @@ export interface BrandingConfig {
 }
 
 export const DEFAULT_BRANDING: BrandingConfig = {
-  app_name: "Uniq",
-  primary_color: "#6366F1",
-  secondary_color: "#8B5CF6",
-  accent_color: "#EC4899",
+  app_name: "qchat",
+  primary_color: "#2563EB",
+  secondary_color: "#3B82F6",
+  accent_color: "#0EA5E9",
   font_family: "inter",
   theme_preset: "modern",
   logo_light_url: "",

@@ -1258,9 +1258,9 @@ html { scroll-behavior: smooth; }
    chegar.
 */
 :root {
-  --brand-primary: 99 102 241;
-  --brand-secondary: 139 92 246;
-  --brand-accent: 236 72 153;
+  --brand-primary: 37 99 235;
+  --brand-secondary: 59 130 246;
+  --brand-accent: 14 165 233;
 }
 
 /* ── Theme presets ───────────────────────────────────────────────────────────

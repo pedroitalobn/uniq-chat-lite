@@ -18,10 +18,10 @@ import (
 // editável pelo admin: cores, fontes, preset de tema, logos e nome do app.
 type BrandingSettings struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
-	AppName        string    `gorm:"size:120;default:'Uniq'" json:"app_name"`
-	PrimaryColor   string    `gorm:"size:32;default:'#6366F1'" json:"primary_color"`
-	SecondaryColor string    `gorm:"size:32;default:'#8B5CF6'" json:"secondary_color"`
-	AccentColor    string    `gorm:"size:32;default:'#EC4899'" json:"accent_color"`
+	AppName        string    `gorm:"size:120;default:'qchat'" json:"app_name"`
+	PrimaryColor   string    `gorm:"size:32;default:'#2563EB'" json:"primary_color"`
+	SecondaryColor string    `gorm:"size:32;default:'#3B82F6'" json:"secondary_color"`
+	AccentColor    string    `gorm:"size:32;default:'#0EA5E9'" json:"accent_color"`
 	FontFamily     string    `gorm:"size:80;default:'inter'" json:"font_family"`
 	ThemePreset    string    `gorm:"size:32;default:'modern'" json:"theme_preset"` // modern|classic|standard|minimal
 	LogoLightURL   string    `json:"logo_light_url"`
@@ -56,8 +56,8 @@ func (h *BrandingHandler) get() (*BrandingSettings, error) {
 	var b BrandingSettings
 	if err := h.db.First(&b, 1).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			b = BrandingSettings{ID: 1, AppName: "Uniq", PrimaryColor: "#6366F1",
-				SecondaryColor: "#8B5CF6", AccentColor: "#EC4899",
+			b = BrandingSettings{ID: 1, AppName: "qchat", PrimaryColor: "#2563EB",
+				SecondaryColor: "#3B82F6", AccentColor: "#0EA5E9",
 				FontFamily: "inter", ThemePreset: "modern"}
 			h.db.Create(&b)
 			return &b, nil
