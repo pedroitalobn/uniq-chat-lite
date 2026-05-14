@@ -205,12 +205,34 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   // Post-actions: ações aplicadas pra cada destinatário após envio.
   // Ex: [{ type:"add_tag", tag:"Contatado-2025-Q1" }]
   type PostAction = {
-    type: "add_tag" | "move_stage";
+    type:
+      | "add_tag"
+      | "remove_tag"
+      | "move_stage"
+      | "create_deal"
+      | "assign_owner"
+      | "add_to_segment"
+      | "create_segment"
+      | "set_custom_field";
+    // add_tag / remove_tag
     tag?: string;
     color?: string;
+    // move_stage / create_deal
     funnel_id?: string;
     stage_id?: string;
     create_if_missing?: boolean;
+    deal_title?: string;
+    deal_value?: number;
+    deal_currency?: string;
+    // assign_owner
+    owner_user_id?: string;
+    apply_to_deal?: boolean;
+    // add_to_segment / create_segment
+    segment_id?: string;
+    segment_name?: string;
+    // set_custom_field
+    field_key?: string;
+    field_value?: string;
   };
   const [postActions, setPostActions] = useState<PostAction[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -1501,14 +1523,20 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       <select
                         value={a.type}
                         onChange={(e) => {
-                          const t = e.target.value as "add_tag" | "move_stage";
+                          const t = e.target.value as PostAction["type"];
                           setPostActions((p) => p.map((x, i) => i === idx ? { type: t } : x));
                         }}
                         className="input-field text-xs"
-                        style={{ width: 160 }}
+                        style={{ width: 200 }}
                       >
                         <option value="add_tag">Adicionar tag</option>
-                        <option value="move_stage">Mover de estágio</option>
+                        <option value="remove_tag">Remover tag</option>
+                        <option value="move_stage">Mover de estágio (deal)</option>
+                        <option value="create_deal">Criar deal nova</option>
+                        <option value="assign_owner">Atribuir owner</option>
+                        <option value="add_to_segment">Adicionar a segmento</option>
+                        <option value="create_segment">Criar segmento c/ todos</option>
+                        <option value="set_custom_field">Setar campo customizado</option>
                       </select>
                       <button type="button"
                         onClick={() => setPostActions((p) => p.filter((_, i) => i !== idx))}
@@ -1517,15 +1545,16 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         Remover
                       </button>
                     </div>
-                    {a.type === "add_tag" ? (
+                    {(a.type === "add_tag" || a.type === "remove_tag") && (
                       <input
                         type="text"
-                        placeholder="Nome da tag (ex: Contatado-2025-Q1)"
+                        placeholder={a.type === "add_tag" ? "Nome da tag (ex: Contatado-2025-Q1)" : "Nome da tag a remover"}
                         value={a.tag || ""}
                         onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, tag: e.target.value } : x))}
                         className="input-field w-full text-xs"
                       />
-                    ) : (
+                    )}
+                    {(a.type === "move_stage" || a.type === "create_deal") && (
                       <div className="space-y-2">
                         <FunnelOptionPicker
                           value={a.funnel_id || ""}
@@ -1538,14 +1567,71 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           onChange={(v) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, stage_id: v } : x))}
                           placeholder="Estágio"
                         />
+                        {a.type === "create_deal" ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="Título da deal (opcional)"
+                              value={a.deal_title || ""}
+                              onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, deal_title: e.target.value } : x))}
+                              className="input-field text-xs col-span-2" />
+                            <input type="number" placeholder="Valor"
+                              value={a.deal_value ?? ""}
+                              onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, deal_value: e.target.value ? Number(e.target.value) : undefined } : x))}
+                              className="input-field text-xs" />
+                            <input type="text" placeholder="Moeda (BRL)"
+                              value={a.deal_currency || ""}
+                              onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, deal_currency: e.target.value } : x))}
+                              className="input-field text-xs" />
+                          </div>
+                        ) : (
+                          <label className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
+                            <input
+                              type="checkbox"
+                              checked={!!a.create_if_missing}
+                              onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, create_if_missing: e.target.checked } : x))}
+                            />
+                            Criar deal se contato não tiver no funil
+                          </label>
+                        )}
+                      </div>
+                    )}
+                    {a.type === "assign_owner" && (
+                      <div className="space-y-2">
+                        <input type="text" placeholder="UUID do usuário (workspace member)"
+                          value={a.owner_user_id || ""}
+                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, owner_user_id: e.target.value } : x))}
+                          className="input-field w-full text-xs font-mono" />
                         <label className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
                           <input
                             type="checkbox"
-                            checked={!!a.create_if_missing}
-                            onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, create_if_missing: e.target.checked } : x))}
+                            checked={!!a.apply_to_deal}
+                            onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, apply_to_deal: e.target.checked } : x))}
                           />
-                          Criar deal se contato não tiver no funil
+                          Aplicar também nas deals abertas do contato
                         </label>
+                      </div>
+                    )}
+                    {a.type === "add_to_segment" && (
+                      <input type="text" placeholder="UUID do segmento (manual)"
+                        value={a.segment_id || ""}
+                        onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, segment_id: e.target.value } : x))}
+                        className="input-field w-full text-xs font-mono" />
+                    )}
+                    {a.type === "create_segment" && (
+                      <input type="text" placeholder="Nome do segmento — cria se não existir"
+                        value={a.segment_name || ""}
+                        onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, segment_name: e.target.value } : x))}
+                        className="input-field w-full text-xs" />
+                    )}
+                    {a.type === "set_custom_field" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="Chave (ex: origem)"
+                          value={a.field_key || ""}
+                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, field_key: e.target.value } : x))}
+                          className="input-field text-xs" />
+                        <input type="text" placeholder="Valor (ex: campanha-jan)"
+                          value={a.field_value || ""}
+                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, field_value: e.target.value } : x))}
+                          className="input-field text-xs" />
                       </div>
                     )}
                   </div>
