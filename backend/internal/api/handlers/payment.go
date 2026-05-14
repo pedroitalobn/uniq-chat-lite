@@ -42,6 +42,36 @@ func (h *PaymentHandler) getProviderForCountry(country string) string {
 	return string(models.PaymentProviderStripe)
 }
 
+// ListMethods devolve quais métodos de pagamento estão habilitados pelo
+// admin pra cada provider. Públicos — o /register lê pra montar o seletor
+// (ex: omite "Cartão" quando o admin desliga). CSV vazio = padrão do
+// provider (todos os métodos suportados).
+func (h *PaymentHandler) ListMethods(c *fiber.Ctx) error {
+	var settings models.PaymentSettings
+	_ = h.db.Where("id = ?", "default").First(&settings).Error
+	split := func(csv string, fallback []string) []string {
+		csv = strings.TrimSpace(csv)
+		if csv == "" {
+			return fallback
+		}
+		parts := strings.Split(csv, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(strings.ToLower(p))
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	return c.JSON(fiber.Map{
+		"active_provider": string(settings.ActiveProvider),
+		"stripe":          split(settings.StripeMethods, []string{"card"}),
+		"asaas":           split(settings.AsaasMethods, []string{"pix_automatic", "credit_card"}),
+		"abacatepay":      split(settings.AbacatepayMethods, []string{"pix", "credit_card"}),
+	})
+}
+
 // ListPlans proxy
 func (h *PaymentHandler) ListPlans(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()

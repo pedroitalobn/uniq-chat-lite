@@ -41,6 +41,17 @@ type PaymentSettings struct {
 	AbacatepayCheckoutType  string `gorm:"type:varchar(20);default:'transparent'" json:"abacatepay_checkout_type"`
 	AbacatepayCountryCodes  string `gorm:"type:text;default:'[]'" json:"abacatepay_country_codes,omitempty"`
 
+	// Métodos de pagamento habilitados por provider — CSV. Vazio = "todos
+	// suportados". Ex: "pix_automatic,credit_card" desliga boleto/pix
+	// avulso pra signups via Asaas. Faturas avulsas usam o mesmo conjunto.
+	// Valores conhecidos:
+	//   Asaas:      pix_automatic, credit_card, pix, boleto
+	//   Stripe:     card, pix, boleto
+	//   Abacatepay: pix, credit_card
+	StripeMethods     string `gorm:"type:text;default:''" json:"stripe_methods"`
+	AsaasMethods      string `gorm:"type:text;default:''" json:"asaas_methods"`
+	AbacatepayMethods string `gorm:"type:text;default:''" json:"abacatepay_methods"`
+
 	// Status do último teste de conectividade por provider. UI usa pra
 	// distinguir "credencial salva no DB" vs "credencial valida que o
 	// provider aceita". Antes a UI mostrava "configurado ✓" só porque

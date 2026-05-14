@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
-import { authApi, plansApi, workspacesApi } from "@/lib/api";
+import { authApi, billingApi, plansApi, workspacesApi } from "@/lib/api";
 import { usePreferences, type Language, type ThemeMode } from "@/lib/preferences";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
@@ -269,6 +269,8 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
           )}
         </Card>
 
+        <BillingHistoryCard isFreePlan={isFreePlan} />
+
         {!isFreePlan && (
           <div className="rounded-xl p-3.5" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
             <p className="text-xs" style={{ color: "var(--text-3)" }}>
@@ -278,6 +280,94 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
         )}
       </div>
     </SectionWrap>
+  );
+}
+
+// BillingHistoryCard — mostra pagamentos do provider + cobranças avulsas
+// que o admin emitiu pro user. Read-only — sem essa card a área de
+// billing ficava cega pro próprio dono da conta.
+type AsaasPayment = {
+  id: string;
+  status: string;
+  value: number;
+  dueDate?: string;
+  description?: string;
+  invoiceUrl?: string;
+  bankSlipUrl?: string;
+};
+type ServiceCharge = {
+  id: string;
+  name: string;
+  amount: number;
+  status: string;
+  invoice_url?: string;
+  created_at: string;
+};
+type BillingHistory = {
+  provider: string;
+  payments: AsaasPayment[];
+  services: ServiceCharge[];
+};
+function BillingHistoryCard({ isFreePlan }: { isFreePlan: boolean }) {
+  const { data, isLoading } = useQuery<BillingHistory>({
+    queryKey: ["billing-history"],
+    queryFn: () => billingApi.history().then((r) => r.data),
+    enabled: !isFreePlan,
+    refetchInterval: 60000,
+  });
+  if (isFreePlan) return null;
+  return (
+    <Card>
+      <p className="text-xs font-medium mb-3" style={{ color: "var(--text-3)" }}>HISTÓRICO DE PAGAMENTOS</p>
+      {isLoading ? (
+        <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-10 rounded-lg" />)}</div>
+      ) : (!data?.payments?.length && !data?.services?.length) ? (
+        <p className="text-xs" style={{ color: "var(--text-3)" }}>Sem cobranças registradas.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {(data?.payments ?? []).slice(0, 10).map((p) => (
+            <a
+              key={p.id}
+              href={p.invoiceUrl || p.bankSlipUrl || "#"}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 text-xs rounded-lg px-3 py-2 transition"
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-medium truncate" style={{ color: "var(--text-1)" }}>
+                  {p.description || "Cobrança"}
+                </p>
+                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                  R$ {p.value?.toFixed?.(2) || p.value} · {p.status} · {p.dueDate || ""}
+                </p>
+              </div>
+              {(p.invoiceUrl || p.bankSlipUrl) && (
+                <span className="text-[10px] underline" style={{ color: "var(--green)" }}>Ver recibo</span>
+              )}
+            </a>
+          ))}
+          {(data?.services ?? []).map((s) => (
+            <a
+              key={s.id}
+              href={s.invoice_url || "#"}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 text-xs rounded-lg px-3 py-2 transition"
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-medium truncate" style={{ color: "var(--text-1)" }}>{s.name}</p>
+                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                  R$ {s.amount.toFixed(2)} · {s.status} · cobrança avulsa
+                </p>
+              </div>
+              {s.invoice_url && <span className="text-[10px] underline" style={{ color: "var(--green)" }}>Pagar</span>}
+            </a>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

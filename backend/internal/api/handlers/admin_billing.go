@@ -9,6 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	stripe "github.com/stripe/stripe-go/v76"
+	stripesession "github.com/stripe/stripe-go/v76/checkout/session"
+	stripecustomer "github.com/stripe/stripe-go/v76/customer"
+	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
@@ -18,13 +22,15 @@ import (
 // inspecionar/agir sobre um user específico. Complementa o BillingHandler
 // (self-serve) e o AdminHandler (settings + plan-history).
 type AdminBillingHandler struct {
-	db       *gorm.DB
-	asaas    *AsaasHandler
-	emailSvc *email.Service
+	db          *gorm.DB
+	asaas       *AsaasHandler
+	stripeH     *StripeHandler
+	abacatepayH *AbacatePayHandler
+	emailSvc    *email.Service
 }
 
-func NewAdminBillingHandler(db *gorm.DB, asaas *AsaasHandler, emailSvc *email.Service) *AdminBillingHandler {
-	return &AdminBillingHandler{db: db, asaas: asaas, emailSvc: emailSvc}
+func NewAdminBillingHandler(db *gorm.DB, asaas *AsaasHandler, stripeH *StripeHandler, abacatepayH *AbacatePayHandler, emailSvc *email.Service) *AdminBillingHandler {
+	return &AdminBillingHandler{db: db, asaas: asaas, stripeH: stripeH, abacatepayH: abacatepayH, emailSvc: emailSvc}
 }
 
 // resolveProvider — escolhe o provider ativo desse user usando a mesma
@@ -619,20 +625,36 @@ func (h *AdminBillingHandler) CreateService(c *fiber.Ctx) error {
 			"status":               "sent",
 		})
 	case "stripe":
-		// TODO: criar Stripe Payment Link / one-off Invoice. Por ora
-		// gravamos pending e devolvemos aviso. Próximo PR pluga
-		// stripe.PaymentLink ou stripe.InvoiceItem.
-		return c.JSON(fiber.Map{
-			"ok":      true,
-			"service": charge,
-			"warning": "Provider Stripe ainda sem cobrança one-off automatizada — emita manualmente no Stripe Dashboard pelo customer_id.",
+		url, sessID, err := h.createStripeOneOff(&user, &charge)
+		if err != nil {
+			h.db.Model(&charge).Update("status", "failed")
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+				"error":   "stripe_checkout_failed",
+				"message": err.Error(),
+				"service": charge,
+			})
+		}
+		emittedURL = url
+		h.db.Model(&charge).Updates(map[string]any{
+			"provider_checkout_id": sessID,
+			"invoice_url":          url,
+			"status":               "sent",
 		})
 	case "abacatepay":
-		// TODO: integrar /v1/checkouts do AbacatePay análogo ao Asaas.
-		return c.JSON(fiber.Map{
-			"ok":      true,
-			"service": charge,
-			"warning": "Provider AbacatePay ainda sem cobrança one-off automatizada — implementação pendente.",
+		url, billingID, err := h.createAbacatepayOneOff(&user, &charge)
+		if err != nil {
+			h.db.Model(&charge).Update("status", "failed")
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+				"error":   "abacatepay_checkout_failed",
+				"message": err.Error(),
+				"service": charge,
+			})
+		}
+		emittedURL = url
+		h.db.Model(&charge).Updates(map[string]any{
+			"provider_checkout_id": billingID,
+			"invoice_url":          url,
+			"status":               "sent",
 		})
 	}
 
@@ -670,4 +692,130 @@ func (h *AdminBillingHandler) CancelService(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"ok": true})
+}
+
+// createStripeOneOff cria um Stripe Checkout Session (mode=payment) com
+// price_data inline pro valor do ServiceCharge. Devolve a URL hospedada
+// pra cliente pagar com cartão (e PIX quando habilitado no dashboard).
+//
+// Stripe não tem o conceito de "PIX Automático" pra one-off; aqui é só
+// um pagamento avulso. Pra recorrência usa-se subscription (já coberto
+// no fluxo de plano), não one-off.
+func (h *AdminBillingHandler) createStripeOneOff(user *models.User, charge *models.ServiceCharge) (string, string, error) {
+	if h.stripeH == nil {
+		return "", "", fmt.Errorf("stripe handler indisponível")
+	}
+	h.stripeH.loadConfig()
+	if strings.TrimSpace(stripe.Key) == "" {
+		return "", "", fmt.Errorf("stripe não configurado no admin")
+	}
+	// Garante customer no Stripe — reaproveita o ID já gravado, ou cria.
+	customerID := strings.TrimSpace(user.StripeCustomerID)
+	if customerID == "" {
+		cp := &stripe.CustomerParams{
+			Email: stripe.String(user.Email),
+			Name:  stripe.String(user.Name),
+			Metadata: map[string]string{"user_id": user.ID.String()},
+		}
+		sc, err := stripecustomer.New(cp)
+		if err != nil {
+			return "", "", fmt.Errorf("stripe customer: %w", err)
+		}
+		customerID = sc.ID
+		h.db.Model(user).Update("stripe_customer_id", customerID)
+	}
+	currency := strings.ToLower(strings.TrimSpace(charge.Currency))
+	if currency == "" {
+		currency = "brl"
+	}
+	frontend := strings.TrimRight(config.AppConfig.FrontendURL, "/")
+	successURL := frontend + "/settings?section=billing&service_paid=" + charge.ID.String()
+	cancelURL := frontend + "/settings?section=billing&service_canceled=" + charge.ID.String()
+	params := &stripe.CheckoutSessionParams{
+		Customer:   stripe.String(customerID),
+		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL: stripe.String(successURL),
+		CancelURL:  stripe.String(cancelURL),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{{
+			Quantity: stripe.Int64(1),
+			PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+				Currency:   stripe.String(currency),
+				UnitAmount: stripe.Int64(int64(charge.Amount * 100)),
+				ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+					Name:        stripe.String(charge.Name),
+					Description: stripe.String(charge.Description),
+				},
+			},
+		}},
+		Metadata: map[string]string{
+			"service_charge_id": charge.ID.String(),
+			"user_id":           user.ID.String(),
+			"kind":              "service_charge",
+		},
+	}
+	sess, err := stripesession.New(params)
+	if err != nil {
+		return "", "", err
+	}
+	return sess.URL, sess.ID, nil
+}
+
+// createAbacatepayOneOff usa POST /v1/billing — endpoint público do
+// AbacatePay pra cobrança PIX one-off. Devolve a URL hospedada do QR
+// que o cliente paga uma vez. Pra recorrência o AbacatePay usa
+// subscriptions (já coberto no fluxo de plano).
+func (h *AdminBillingHandler) createAbacatepayOneOff(user *models.User, charge *models.ServiceCharge) (string, string, error) {
+	if h.abacatepayH == nil {
+		return "", "", fmt.Errorf("abacatepay handler indisponível")
+	}
+	if strings.TrimSpace(h.abacatepayH.getAPIKey()) == "" {
+		return "", "", fmt.Errorf("abacatepay não configurado no admin")
+	}
+	frontend := strings.TrimRight(config.AppConfig.FrontendURL, "/")
+	payload := map[string]any{
+		"frequency":  "ONE_TIME",
+		"methods":    []string{"PIX"},
+		"products": []map[string]any{{
+			"externalId":  charge.ID.String(),
+			"name":        charge.Name,
+			"description": charge.Description,
+			"quantity":    1,
+			"price":       int64(charge.Amount * 100), // centavos
+		}},
+		"returnUrl":     frontend + "/settings?section=billing&service_canceled=" + charge.ID.String(),
+		"completionUrl": frontend + "/settings?section=billing&service_paid=" + charge.ID.String(),
+		"customer": map[string]any{
+			"name":     user.Name,
+			"email":    user.Email,
+			"cellphone": user.Phone,
+			"taxId":    user.TaxID,
+		},
+		"externalId": charge.ID.String(),
+		"metadata": map[string]string{
+			"service_charge_id": charge.ID.String(),
+			"user_id":           user.ID.String(),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	respBytes, err := h.abacatepayH.apiRequest("POST", "/v1/billing/create", body)
+	if err != nil {
+		return "", "", err
+	}
+	var parsed struct {
+		Data struct {
+			ID  string `json:"id"`
+			URL string `json:"url"`
+		} `json:"data"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(respBytes, &parsed); err != nil {
+		return "", "", fmt.Errorf("abacatepay response invalid: %s", string(respBytes))
+	}
+	if parsed.Error != "" {
+		return "", "", fmt.Errorf("abacatepay: %s", parsed.Error)
+	}
+	if parsed.Data.URL == "" {
+		return "", "", fmt.Errorf("abacatepay response sem url: %s", string(respBytes))
+	}
+	return parsed.Data.URL, parsed.Data.ID, nil
 }

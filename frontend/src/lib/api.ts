@@ -593,6 +593,7 @@ export const newsletterApi = {
 // Billing — upgrade/cancel/preview com Stripe proration nativa.
 export const billingApi = {
   status: () => api.get("/v1/billing/status"),
+  history: () => api.get("/v1/billing/history"),
   preview: (planId: string) => api.get(`/v1/billing/preview/${planId}`),
   upgrade: (planId: string) => api.post("/v1/billing/upgrade", { plan_id: planId }),
   cancel: (immediate = false) => api.post("/v1/billing/cancel", { immediate }),

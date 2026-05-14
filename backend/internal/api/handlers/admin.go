@@ -103,6 +103,9 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		"abacatepay_environment":   settings.AbacatepayEnvironment,
 		"abacatepay_checkout_type": settings.AbacatepayCheckoutType,
 		"abacatepay_country_codes": normalizeCountryList(settings.AbacatepayCountryCodes),
+		"stripe_methods":           splitCSV(settings.StripeMethods),
+		"asaas_methods":            splitCSV(settings.AsaasMethods),
+		"abacatepay_methods":       splitCSV(settings.AbacatepayMethods),
 		// Previews mascarados — UI mostra os primeiros/últimos 4
 		// chars pra admin saber qual chave/ambiente está salvo
 		// (ex.: sk_live_*** vs sk_test_***) sem expor o segredo.
@@ -292,6 +295,9 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 		AbacatepayEnvironment   string    `json:"abacatepay_environment"`
 		AbacatepayCheckoutType  string    `json:"abacatepay_checkout_type"`
 		AbacatepayCountryCodes  *[]string `json:"abacatepay_country_codes"`
+		StripeMethods           *[]string `json:"stripe_methods"`
+		AsaasMethods            *[]string `json:"asaas_methods"`
+		AbacatepayMethods       *[]string `json:"abacatepay_methods"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -355,6 +361,15 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	}
 	if req.AbacatepayCountryCodes != nil {
 		updates["abacatepay_country_codes"] = encodeCountryCodes(*req.AbacatepayCountryCodes)
+	}
+	if req.StripeMethods != nil {
+		updates["stripe_methods"] = strings.Join(*req.StripeMethods, ",")
+	}
+	if req.AsaasMethods != nil {
+		updates["asaas_methods"] = strings.Join(*req.AsaasMethods, ",")
+	}
+	if req.AbacatepayMethods != nil {
+		updates["abacatepay_methods"] = strings.Join(*req.AbacatepayMethods, ",")
 	}
 
 	if len(updates) > 0 {

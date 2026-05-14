@@ -77,7 +77,31 @@ interface PaymentConfig {
   abacatepay_webhook_secret: string;
   abacatepay_environment: string;
   abacatepay_checkout_type: "redirect" | "transparent";
+  stripe_methods: string[];
+  asaas_methods: string[];
+  abacatepay_methods: string[];
 }
+
+// Catálogo de métodos por provider — usado pra renderizar os checkboxes
+// de "métodos aceitos pra cobrança". Espelha o que cada provider sabe
+// processar; backend só salva a lista, sem validar.
+const PROVIDER_METHODS: Record<string, { id: string; label: string }[]> = {
+  stripe: [
+    { id: "card", label: "Cartão internacional" },
+    { id: "pix", label: "PIX (Stripe BR)" },
+    { id: "boleto", label: "Boleto" },
+  ],
+  asaas: [
+    { id: "pix_automatic", label: "PIX Automático (recorrente)" },
+    { id: "credit_card", label: "Cartão (recorrente)" },
+    { id: "pix", label: "PIX avulso" },
+    { id: "boleto", label: "Boleto avulso" },
+  ],
+  abacatepay: [
+    { id: "pix", label: "PIX" },
+    { id: "credit_card", label: "Cartão" },
+  ],
+};
 
 export default function PaymentSettingsPage() {
   const queryClient = useQueryClient();
@@ -100,6 +124,9 @@ export default function PaymentSettingsPage() {
     abacatepay_webhook_secret: "",
     abacatepay_environment: "sandbox",
     abacatepay_checkout_type: "redirect",
+    stripe_methods: [],
+    asaas_methods: [],
+    abacatepay_methods: [],
   });
 
   const [activeProvider, setActiveProvider] = useState("stripe");
@@ -124,7 +151,10 @@ export default function PaymentSettingsPage() {
       newForm.abacatepay_api_key !== "" ||
       newForm.abacatepay_webhook_secret !== (settings.abacatepay_webhook_secret || "") ||
       newForm.abacatepay_environment !== (settings.abacatepay_environment || "sandbox") ||
-      newForm.abacatepay_checkout_type !== (settings.abacatepay_checkout_type || "redirect")
+      newForm.abacatepay_checkout_type !== (settings.abacatepay_checkout_type || "redirect") ||
+      JSON.stringify(newForm.stripe_methods) !== JSON.stringify((settings as unknown as { stripe_methods?: string[] }).stripe_methods ?? []) ||
+      JSON.stringify(newForm.asaas_methods) !== JSON.stringify((settings as unknown as { asaas_methods?: string[] }).asaas_methods ?? []) ||
+      JSON.stringify(newForm.abacatepay_methods) !== JSON.stringify((settings as unknown as { abacatepay_methods?: string[] }).abacatepay_methods ?? [])
     );
   };
 
@@ -144,6 +174,9 @@ export default function PaymentSettingsPage() {
         abacatepay_webhook_secret: settings.abacatepay_webhook_secret || "",
         abacatepay_environment: settings.abacatepay_environment || "sandbox",
         abacatepay_checkout_type: settings.abacatepay_checkout_type as "redirect" | "transparent" || "redirect",
+        stripe_methods: (settings as unknown as { stripe_methods?: string[] }).stripe_methods ?? [],
+        asaas_methods: (settings as unknown as { asaas_methods?: string[] }).asaas_methods ?? [],
+        abacatepay_methods: (settings as unknown as { abacatepay_methods?: string[] }).abacatepay_methods ?? [],
       }));
       setHasChanges(false);
     }
@@ -859,6 +892,40 @@ export default function PaymentSettingsPage() {
           )}
         </div>
       )}
+
+      {/* Métodos de pagamento habilitados para o provider ativo */}
+      <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Métodos de pagamento aceitos</p>
+          <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            Liga/desliga o que o cliente vê no checkout do provider <span className="font-mono">{displayProvider}</span>.
+            Vazio = todos os métodos suportados pelo provider.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(PROVIDER_METHODS[displayProvider] ?? []).map((m) => {
+            const key = `${displayProvider}_methods` as "stripe_methods" | "asaas_methods" | "abacatepay_methods";
+            const enabled = form[key].includes(m.id);
+            return (
+              <label key={m.id} className="flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer"
+                style={{ background: enabled ? "rgba(0,212,106,0.06)" : "var(--input)", border: `1px solid ${enabled ? "rgba(0,212,106,0.2)" : "var(--border-default)"}` }}
+              >
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                      ? [...form[key], m.id]
+                      : form[key].filter((x) => x !== m.id);
+                    updateForm({ [key]: next } as Partial<PaymentConfig>);
+                  }}
+                />
+                <span className="text-xs" style={{ color: "var(--text-1)" }}>{m.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Botão Salvar */}
       <div className="flex justify-end">

@@ -392,6 +392,8 @@ function CompleteForm({
   // null = ainda não escolheu. Forçar a escolha evita disparo de PIX
   // sem o user ter realmente decidido.
   const [asaasMethod, setAsaasMethod] = useState<"pix_automatic" | "credit_card" | null>(null);
+  // Métodos habilitados pelo admin para o provider ativo. Vazio = todos.
+  const [allowedAsaasMethods, setAllowedAsaasMethods] = useState<string[]>(["pix_automatic", "credit_card"]);
   // Quando o user finaliza com PIX Automático, exibimos o QR inline aqui
   // mesmo no modal (sem redirect pra /checkout). "Trocar método" vira
   // só um setPixQrState(null) — o form fica intacto.
@@ -451,6 +453,22 @@ function CompleteForm({
     loadPlans();
     return () => { cancelled = true; };
   }, [hasPrefilledPlan]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${API}/v1/payments/methods`);
+        if (!r.ok) return;
+        const data: { asaas?: string[] } = await r.json();
+        if (cancelled) return;
+        if (Array.isArray(data.asaas) && data.asaas.length > 0) {
+          setAllowedAsaasMethods(data.asaas);
+        }
+      } catch { /* sem rede — usa default */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanID);
   const isPaid = hasPrefilledPlan
@@ -918,10 +936,10 @@ function CompleteForm({
             <SecureHeader planLabel={planLabel} planPriceVal={planPriceVal} />
 
             <div className="grid grid-cols-2 gap-2">
-              {([
+              {(([
                 { id: "pix_automatic", label: "PIX Automático", icon: "⚡" },
                 { id: "credit_card",   label: "Cartão",          icon: "💳" },
-              ] as const).map((opt) => {
+              ] as const).filter((opt) => allowedAsaasMethods.includes(opt.id))).map((opt) => {
                 const active = asaasMethod === opt.id;
                 return (
                   <motion.button

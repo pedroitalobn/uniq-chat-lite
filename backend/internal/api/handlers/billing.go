@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -500,5 +502,49 @@ func (h *BillingHandler) Status(c *fiber.Ctx) error {
 		"plan":                       user.Plan,
 		"stripe_subscription_id":     user.StripeSubscriptionID,
 		"stripe_subscription_status": user.StripeSubscriptionStatus,
+	})
+}
+
+// History GET /v1/billing/history
+// Devolve o histórico de cobranças do próprio user logado: ServiceCharges
+// no banco + (se provider=asaas) últimos pagamentos do customer no provider.
+// É read-only — alterações ficam no AdminBillingHandler.
+func (h *BillingHandler) History(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	h.db.Preload("Plan").First(user, "id = ?", user.ID)
+
+	var charges []models.ServiceCharge
+	h.db.Where("user_id = ?", user.ID).Order("created_at DESC").Limit(50).Find(&charges)
+
+	payments := []map[string]any{}
+	if strings.TrimSpace(user.AsaasCustomerID) != "" {
+		_, body, err := h.asaas.Request("GET",
+			"/api/v3/payments?customer="+user.AsaasCustomerID+"&limit=20&order=desc", nil)
+		if err == nil {
+			var listed struct {
+				Data []map[string]any `json:"data"`
+			}
+			if json.Unmarshal(body, &listed) == nil {
+				payments = listed.Data
+			}
+		}
+	}
+	return c.JSON(fiber.Map{
+		"plan":     user.Plan,
+		"provider": h.resolveProvider(user),
+		"asaas": fiber.Map{
+			"subscription_id": user.AsaasSubscriptionID,
+			"status":          user.AsaasSubscriptionStatus,
+			"next_charge_at":  user.AsaasNextChargeAt,
+		},
+		"stripe": fiber.Map{
+			"subscription_id": user.StripeSubscriptionID,
+			"status":          user.StripeSubscriptionStatus,
+		},
+		"services": charges,
+		"payments": payments,
 	})
 }

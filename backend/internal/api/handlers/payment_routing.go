@@ -64,6 +64,23 @@ func cleanCountryCodes(values []string) []string {
 	return out
 }
 
+// splitCSV — helper pequeno usado pelas configs de billing methods.
+func splitCSV(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return []string{}
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(strings.ToLower(p))
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func encodeCountryCodes(values []string) string {
 	clean := cleanCountryCodes(values)
 	if len(clean) == 0 {
