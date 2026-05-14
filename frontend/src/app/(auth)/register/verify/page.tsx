@@ -388,7 +388,9 @@ function CompleteForm({
   const [step, setStep] = useState(0);
   // Asaas: forma de pagamento. Default PIX Automático (consentimento +
   // débitos auto). Cartão usa CREDIT_CARD transparente.
-  const [asaasMethod, setAsaasMethod] = useState<"pix_automatic" | "credit_card">("pix_automatic");
+  // null = ainda não escolheu. Forçar a escolha evita disparo de PIX
+  // sem o user ter realmente decidido.
+  const [asaasMethod, setAsaasMethod] = useState<"pix_automatic" | "credit_card" | null>(null);
   const [card, setCard] = useState({
     holderName: "",
     number: "",
@@ -494,6 +496,11 @@ function CompleteForm({
       if (password.length < 8) e.password = "Mínimo 8 caracteres";
       if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     }
+    if (nextStep === 3 && isPaid) {
+      if (!asaasMethod) {
+        e.global = "Escolha uma forma de pagamento (PIX Automático ou Cartão)";
+      }
+    }
     if (nextStep === 3 && isPaid && asaasMethod === "credit_card") {
       if (!card.holderName.trim()) e.cardHolder = "Nome no cartão é obrigatório";
       const num = card.number.replace(/\D/g, "");
@@ -551,7 +558,7 @@ function CompleteForm({
           account_type: accountType,
           company_name: company.trim() || undefined,
           plan_id: selectedPlanID || undefined,
-          asaas_payment_method: asaasMethod,
+          asaas_payment_method: asaasMethod ?? "pix_automatic",
           asaas_card: asaasMethod === "credit_card" ? {
             holder_name: card.holderName,
             number: card.number.replace(/\s+/g, ""),
@@ -1113,20 +1120,6 @@ function VerifyContent() {
         animate={{ x: [0, -25, 0], y: [0, -15, 0], opacity: [0.55, 0.85, 0.55] }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
       />
-      {/* Grid sutil — vetor SVG inline, dá impressão de plano holográfico. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-        }}
-      />
-
       <motion.div
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
