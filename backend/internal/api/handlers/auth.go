@@ -1807,23 +1807,33 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			// lado do merchant. Usamos pending+plan pra que reexecução do
 			// signup pra mesma sessão reidentifique o mesmo contrato (sem
 			// criar duplicados se o user clicar duas vezes).
-			contractID := "uniq-" + pending.ID.String() + "-" + plan.ID.String()
+			// contractId tem limite de 35 chars no Asaas. Usamos prefixo +
+			// hex(pending_id) sem hifens (32 chars do UUID → cabe).
+			contractID := "u-" + strings.ReplaceAll(pending.ID.String(), "-", "")
+			if len(contractID) > 35 {
+				contractID = contractID[:35]
+			}
+			// description também tem cap de 35 chars.
+			description := plan.Name
+			if len(description) > 35 {
+				description = description[:35]
+			}
 			now := time.Now()
 			authReq := AsaasPixAutomaticAuthRequest{
-				Customer:          customerID,
-				Value:             plan.Price,
-				Frequency:         "MONTHLY",
-				ContractID:        contractID,
-				StartDate:         now.Format("2006-01-02"),
-				NextDueDate:       now.Format("2006-01-02"),
-				// Consentimento válido por 5 anos. Asaas/BACEN tipicamente
-				// aceita até esse horizonte e o cliente pode revogar a
-				// autorização quando quiser; renovação acontece se a gente
-				// recriar a autorização antes do vencimento.
-				ExpirationDate:    now.AddDate(5, 0, 0).Format("2006-01-02"),
-				Cycle:             "MONTHLY",
-				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
-				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
+				CustomerID:    customerID,
+				Frequency:     "MONTHLY",
+				ContractID:    contractID,
+				StartDate:     now.Format("2006-01-02"),
+				// 5 anos cobre horizon razoável de assinatura recorrente;
+				// renovamos antes se ainda ativo.
+				FinishDate:    now.AddDate(5, 0, 0).Format("2006-01-02"),
+				Value:         plan.Price,
+				Description:   description,
+				ImmediateQrCode: AsaasPixAutoImmediateChargeRequest{
+					OriginalValue:     plan.Price,
+					ExpirationSeconds: 24 * 60 * 60, // 24h pra pagar a 1ª cobrança
+					Description:       description,
+				},
 			}
 			auth, raw, err := h.asaasH.CreatePixAutomaticAuthorization(authReq)
 			if err != nil || auth == nil || auth.ID == "" {
@@ -1845,9 +1855,16 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				"pending_id":       pending.ID.String(),
 				"message":          "Pague o PIX abaixo pra confirmar. Os próximos meses serão debitados automaticamente.",
 			}
+			// Schema oficial: payload e encodedImage ficam no topo da
+			// response; immediateQrCode só traz conciliationIdentifier +
+			// expirationDate.
+			if auth.Payload != "" {
+				out["br_code"] = auth.Payload
+			}
+			if auth.EncodedImage != "" {
+				out["br_code_base64"] = auth.EncodedImage
+			}
 			if auth.ImmediateQrCode != nil {
-				out["br_code"] = auth.ImmediateQrCode.Payload
-				out["br_code_base64"] = auth.ImmediateQrCode.EncodedImage
 				out["conciliation_identifier"] = auth.ImmediateQrCode.ConciliationIdentifier
 				if auth.ImmediateQrCode.ExpirationDate != "" {
 					out["expires_at"] = auth.ImmediateQrCode.ExpirationDate

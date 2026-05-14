@@ -580,51 +580,84 @@ func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 // frequency é obrigatório (Asaas devolve parse_error sem ele); cycle
 // segue como complemento opcional pra ficar compatível com docs antigas
 // onde só cycle aparecia.
-// AsaasPixAutomaticAuthRequest — payload de criação da autorização
-// PIX Automático. Conjunto completo de campos observados como
-// obrigatórios pela API v3 do Asaas:
-//   - customer, value (basics)
-//   - frequency (MONTHLY etc.)
-//   - contractId (id único do contrato no merchant)
-//   - startDate (quando a autorização começa a valer)
-//   - nextDueDate (quando cobrar a primeira parcela)
-//   - expirationDate (quando o consentimento expira — anos no futuro)
-// description e externalReference são opcionais.
+// AsaasPixAutomaticAuthRequest — payload conforme OpenAPI oficial:
+// POST /v3/pix/automatic/authorizations (sandbox: api-sandbox.asaas.com).
+// Schema: PixReceiverAutomaticRecurringAuthorizationSaveRequestDTO.
+//
+// Obrigatórios:
+//   customerId       — id do customer Asaas
+//   frequency        — WEEKLY | MONTHLY | QUARTERLY | SEMIANNUALLY | ANNUALLY
+//   contractId       — identificador do contrato no merchant (≤ 35 chars)
+//   startDate        — YYYY-MM-DD, início da vigência
+//   immediateQrCode  — cobrança imediata que ativa o consentimento
+//
+// Opcionais:
+//   finishDate       — fim da vigência (sem isso, autorização é indeterminada)
+//   value            — valor FIXO das recorrências (quando setado, todas as
+//                       cobranças terão esse valor)
+//   description      — descrição (≤ 35 chars)
+//   minLimitValue    — piso pra autorizações de valor variável (não pode
+//                       ser usado junto com value)
 type AsaasPixAutomaticAuthRequest struct {
-	Customer          string  `json:"customer"`
-	Value             float64 `json:"value"`
-	Frequency         string  `json:"frequency"`
-	ContractID        string  `json:"contractId"`
-	StartDate         string  `json:"startDate"`
-	NextDueDate       string  `json:"nextDueDate"`
-	ExpirationDate    string  `json:"expirationDate"`
-	Cycle             string  `json:"cycle,omitempty"` // legacy compat
+	CustomerID      string                             `json:"customerId"`
+	Frequency       string                             `json:"frequency"`
+	ContractID      string                             `json:"contractId"`
+	StartDate       string                             `json:"startDate"`
+	FinishDate      string                             `json:"finishDate,omitempty"`
+	Value           float64                            `json:"value,omitempty"`
+	Description     string                             `json:"description,omitempty"`
+	MinLimitValue   float64                            `json:"minLimitValue,omitempty"`
+	ImmediateQrCode AsaasPixAutoImmediateChargeRequest `json:"immediateQrCode"`
+}
+
+// AsaasPixAutoImmediateChargeRequest — sub-objeto da cobrança imediata.
+// Schema: PixReceiverAutomaticRecurringAuthorizationImmediateQrCodeRequestDTO.
+//
+// Obrigatórios:
+//   originalValue      — valor da primeira cobrança
+//   expirationSeconds  — TTL do QR em segundos (ex: 3600 = 1h)
+//
+// Opcionais:
+//   pixKey      — chave PIX atrelada (se não vier, usa a padrão da conta)
+//   description — descrição da primeira cobrança
+type AsaasPixAutoImmediateChargeRequest struct {
+	OriginalValue     float64 `json:"originalValue"`
+	ExpirationSeconds int     `json:"expirationSeconds"`
+	PixKey            string  `json:"pixKey,omitempty"`
 	Description       string  `json:"description,omitempty"`
-	ExternalReference string  `json:"externalReference,omitempty"`
 }
 
-// AsaasPixAutomaticAuthResponse — resposta da criação. O cliente paga
-// ImmediateQrCode (payload PIX copia-e-cola + imagem base64). ID e
-// ConciliationIdentifier ficam guardados pra cobranças futuras.
+// AsaasPixAutomaticAuthResponse — resposta da criação. Conforme OpenAPI:
+// payload e encodedImage do QR ficam no TOPO (não dentro de
+// immediateQrCode); immediateQrCode só carrega conciliationIdentifier
+// e expirationDate da primeira cobrança.
 type AsaasPixAutomaticAuthResponse struct {
-	ID              string                       `json:"id"`
-	Status          string                       `json:"status"`
-	Customer        string                       `json:"customer"`
-	Value           float64                      `json:"value"`
-	Cycle           string                       `json:"cycle"`
-	NextDueDate     string                       `json:"nextDueDate"`
-	ExpirationDate  string                       `json:"expirationDate,omitempty"`
-	ImmediateQrCode *AsaasPixAutomaticImmediate  `json:"immediateQrCode,omitempty"`
+	ID                 string                      `json:"id"`
+	Status             string                      `json:"status"`
+	CustomerID         string                      `json:"customerId"`
+	ContractID         string                      `json:"contractId"`
+	Frequency          string                      `json:"frequency"`
+	StartDate          string                      `json:"startDate"`
+	FinishDate         string                      `json:"finishDate,omitempty"`
+	Value              float64                     `json:"value,omitempty"`
+	MinLimitValue      float64                     `json:"minLimitValue,omitempty"`
+	Description        string                      `json:"description,omitempty"`
+	EndToEndIdentifier string                      `json:"endToEndIdentifier,omitempty"`
+	SubscriptionID     string                      `json:"subscriptionId,omitempty"`
+	OriginType         string                      `json:"originType,omitempty"`
+	CancellationDate   string                      `json:"cancellationDate,omitempty"`
+	CancellationReason string                      `json:"cancellationReason,omitempty"`
+	// QR de pagamento — fica no top-level no schema oficial.
+	Payload         string                      `json:"payload,omitempty"`
+	EncodedImage    string                      `json:"encodedImage,omitempty"`
+	ImmediateQrCode *AsaasPixAutomaticImmediate `json:"immediateQrCode,omitempty"`
 }
 
+// AsaasPixAutomaticImmediate — sub-objeto na response com identificador
+// de conciliação + expiração da primeira cobrança.
 type AsaasPixAutomaticImmediate struct {
-	// Conteúdo PIX copia-e-cola (BR Code). Frontend renderiza como QR
-	// e também como texto pra copiar.
-	Payload string `json:"payload"`
-	// EncodedImage — base64 do PNG do QR (opcional; nem todos retornam).
-	EncodedImage         string `json:"encodedImage,omitempty"`
-	ExpirationDate       string `json:"expirationDate,omitempty"`
 	ConciliationIdentifier string `json:"conciliationIdentifier,omitempty"`
+	ExpirationDate         string `json:"expirationDate,omitempty"`
 }
 
 // CreatePixAutomaticAuthorization — cria a autorização no endpoint novo
