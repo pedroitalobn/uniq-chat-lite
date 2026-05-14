@@ -23,9 +23,19 @@ function ConfirmDialog({
   return (
     <div
       style={{
-        position: "fixed", inset: 0, zIndex: 9999,
+        // z-index máximo do CSS spec — algumas colunas do inbox usam
+        // backdrop-filter, transform ou will-change e viram containing
+        // block pra descendentes position:fixed. Em conjunto com z-index
+        // alto isso prendia o modal "atrás" da coluna central. Como o
+        // showConfirm appenda o container direto em document.body, isso
+        // não devia bater — mas alguns navegadores tratam stacking
+        // contexts entre roots react isolados de forma estranha. O
+        // valor de 2147483647 + isolation:isolate fecha qualquer brecha.
+        position: "fixed", inset: 0, zIndex: 2147483647,
+        isolation: "isolate",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "16px",
+        pointerEvents: "auto",
         background: "rgba(0,0,0,0.60)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
@@ -100,6 +110,12 @@ export function showConfirm(message: string, opts?: ConfirmOptions): Promise<boo
   if (typeof window === "undefined") return Promise.resolve(false);
   return new Promise((resolve) => {
     const container = document.createElement("div");
+    // O container precisa ser SEMPRE o último filho do body e criar seu
+    // próprio stacking context — isso garante que mesmo se algum modal
+    // sheet/portal existente estiver com zIndex alto, o confirm fica
+    // por cima e não fica preso atrás de colunas com backdrop-filter.
+    container.style.position = "relative";
+    container.style.zIndex = "2147483647";
     document.body.appendChild(container);
     const root = createRoot(container);
 
