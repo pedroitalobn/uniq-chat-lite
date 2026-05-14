@@ -2657,8 +2657,23 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		ctx := eventContext{isGroup: isGroup, isFromMe: isFromMe}
 		cfg := ic.getSettings()
 
+		// Diagnóstico — log no nível INFO no momento exato em que o socket
+		// entrega o evento, antes de QUALQUER filtro. Ajuda a separar
+		// "mensagem não chegou no socket" de "chegou mas foi filtrada
+		// downstream". Imprescindível quando o operador reporta "agente
+		// não responde" e nenhum log de automation aparece.
+		log.Info().
+			Str("instance", ic.ID).
+			Str("from", v.Info.Sender.String()).
+			Str("chat", v.Info.Chat.String()).
+			Bool("from_me", isFromMe).
+			Bool("group", isGroup).
+			Str("msg_id", v.Info.ID).
+			Msg("whatsapp: events.Message recebido do socket")
+
 		// Instance-level group filter
 		if cfg.IgnoreGroups && isGroup {
+			log.Info().Str("instance", ic.ID).Str("from", v.Info.Sender.String()).Msg("whatsapp: ignored — instance has IgnoreGroups")
 			return
 		}
 
