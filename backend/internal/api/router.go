@@ -271,6 +271,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	serverH := handlers.NewServerHandler(db, whatsapp.GetHub())
 	integrationH := handlers.NewIntegrationHandler(db)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
+	brandingH := handlers.NewBrandingHandler(db, storage.GlobalStorage)
 
 	// TikTok automation (legacy taktik bridge)
 	taktikSvc := services.NewTaktikService(db)
@@ -469,6 +470,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 
 	// ─── Public v1 routes (no auth required) ─────────────────────────────────
 	v1Public := app.Group("/v1")
+
+	// White-label: branding público para a página de login.
+	v1Public.Get("/branding/public", brandingH.GetPublic)
 
 	// Invite system (public) — rate limit pra evitar enumeração de tokens.
 	v1Public.Get("/invites/status", inviteH.GetStatus)
@@ -1699,7 +1703,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	linkPreviewH := handlers.NewLinkPreviewHandler(linkPreviewSvc)
 	api.Get("/link-preview", linkPreviewH.Get)
 
+	// White-label branding (auth required, mutation só admin).
+	api.Get("/branding", brandingH.Get)
+
 	admin := api.Group("/admin", middleware.RequireAdmin())
+	admin.Put("/branding", brandingH.Update)
+	admin.Post("/branding/upload", brandingH.Upload)
 	// Diagnostic: media storage health check (upload+presign+fetch)
 	admin.Get("/media/health", mediaH.Check)
 	// Rotas específicas primeiro (sem parâmetros)
