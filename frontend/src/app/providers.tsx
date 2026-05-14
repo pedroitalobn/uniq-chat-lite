@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { useState } from "react";
 import { PreferencesProvider } from "@/lib/preferences";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
+import { BrandingProvider } from "@/features/branding/BrandingProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,6 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <QueryClientProvider client={queryClient}>
+        <BrandingProvider>
         <PreferencesProvider>
           <WebSocketProvider>
             {children}
@@ -34,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             />
           </WebSocketProvider>
         </PreferencesProvider>
+        </BrandingProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

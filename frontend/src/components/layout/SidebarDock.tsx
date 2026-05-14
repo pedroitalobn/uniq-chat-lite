@@ -326,8 +326,9 @@ export function SidebarDock() {
 
   const adminItems = [
     { href: "/admin/users",       label: t("nav_users"),  icon: Users },
-    { href: "/admin/plans",       label: t("nav_plans"),  icon: CreditCard },
+    ...(features.billing ? [{ href: "/admin/plans", label: t("nav_plans"), icon: CreditCard }] : []),
     { href: "/admin/providers",   label: "Providers",     icon: Layers },
+    { href: "/admin/branding",    label: "Branding",      icon: Sparkles },
     // Uniq AI vive como aba dentro de /admin/providers (?tab=ai)
     { href: "/admin/inspect",     label: "Inspect",       icon: Server },
   ];

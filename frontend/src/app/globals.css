@@ -1250,3 +1250,76 @@ html { scroll-behavior: smooth; }
 .uniq-keyboard-aware-bottom {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--kb-h));
 }
+
+/* ── White-label brand variables ─────────────────────────────────────────────
+   BrandingProvider injeta cores como tuplas R G B (sem rgb(...)). Componentes
+   que querem usar opacidade combinam: color: rgb(var(--brand-primary) / 0.5)
+   Defaults idênticos aos do backend para SSR consistente até o fetch público
+   chegar.
+*/
+:root {
+  --brand-primary: 99 102 241;
+  --brand-secondary: 139 92 246;
+  --brand-accent: 236 72 153;
+}
+
+/* ── Theme presets ───────────────────────────────────────────────────────────
+   BrandingProvider seta data-theme="modern|classic|standard|minimal" no <html>.
+   Cada preset reconfigura tipografia, radius, sombras e efeito de superfície.
+*/
+
+/* Modern — Inter, radius generoso, glassmorphism em surfaces.            */
+html[data-theme="modern"] {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 14px;
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -8px rgba(0,0,0,0.18);
+}
+html[data-theme="modern"] body { font-family: var(--font-sans); }
+html[data-theme="modern"] .surface-2 {
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+/* Classic — serif sóbria, radius curto, sem glass.                       */
+html[data-theme="classic"] {
+  --font-sans: "Playfair Display", "Georgia", ui-serif, serif;
+  --radius-card: 6px;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px -6px rgba(0,0,0,0.12);
+}
+html[data-theme="classic"] body { font-family: var(--font-sans); letter-spacing: 0.01em; }
+html[data-theme="classic"] .surface-2 { backdrop-filter: none; }
+
+/* Standard — Geist neutro (padrão atual do app).                          */
+html[data-theme="standard"] {
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 10px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.08);
+}
+html[data-theme="standard"] body { font-family: var(--font-sans); }
+
+/* Minimal — sem sombras, radius zero, monocromático.                      */
+html[data-theme="minimal"] {
+  --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 0px;
+  --shadow-card: none;
+}
+html[data-theme="minimal"] body { font-family: var(--font-sans); }
+html[data-theme="minimal"] .surface-2,
+html[data-theme="minimal"] .surface-1 {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+}
+
+/* Aplica radius/shadow do preset a qualquer .card branded.               */
+.brand-card {
+  border-radius: var(--radius-card, 10px);
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.08));
+}
+
+/* Helper para usar cor primária com Tailwind via classe utilitária.       */
+.bg-brand-primary { background-color: rgb(var(--brand-primary)); }
+.bg-brand-secondary { background-color: rgb(var(--brand-secondary)); }
+.bg-brand-accent { background-color: rgb(var(--brand-accent)); }
+.text-brand-primary { color: rgb(var(--brand-primary)); }
+.border-brand-primary { border-color: rgb(var(--brand-primary)); }

@@ -47,6 +47,15 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // White-label brand tokens — injetados pelo BrandingProvider como
+        // tuplas R G B em --brand-*. Permite usar utilitários como
+        // text-brand/30 ou bg-brand/70 com opacidade.
+        brand: {
+          DEFAULT: "rgb(var(--brand-primary) / <alpha-value>)",
+          primary: "rgb(var(--brand-primary) / <alpha-value>)",
+          secondary: "rgb(var(--brand-secondary) / <alpha-value>)",
+          accent: "rgb(var(--brand-accent) / <alpha-value>)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

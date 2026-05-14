@@ -2553,3 +2553,18 @@ export const platformVoiceApi = {
     api.post<{ ok: boolean; message: string }>(`/v1/admin/platform-voice/${id}/test`),
   listPublic: () => api.get<PlatformVoiceConfig[]>("/v1/integrations/platform-voice"),
 };
+
+// White-label branding API.
+export const brandingApi = {
+  get: () => api.get("/v1/branding"),
+  getPublic: () => api.get("/v1/branding/public"),
+  update: (patch: Record<string, any>) => api.put("/v1/branding", patch),
+  upload: (kind: "logo_light" | "logo_dark" | "favicon" | "login_bg", file: File) => {
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("file", file);
+    return api.post<{ url: string; kind: string }>("/v1/admin/branding/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+};
