@@ -495,3 +495,179 @@ func buildCheckoutLinkEmail(name, planName string, value float64, url, message s
 <p style="font-size:11px;color:#94a3b8;margin-top:24px;">Pagamento processado com segurança pelo Asaas — autorizado pelo BACEN.</p>
 </div>`
 }
+
+// ListServices GET /v1/admin/users/:id/billing/services
+// Lista cobranças de serviços extras emitidas pra esse user.
+func (h *AdminBillingHandler) ListServices(c *fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var charges []models.ServiceCharge
+	if err := h.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(100).Find(&charges).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"data": charges, "total": len(charges)})
+}
+
+// CreateService POST /v1/admin/users/:id/billing/services
+// Body: { name, description?, amount, currency?, category?, recurring_cycle?,
+//         send_email? (bool), provider? (force; default = active provider do user) }
+//
+// Cria um ServiceCharge + gera cobrança/checkout no provider ativo do
+// user. Funciona com qualquer um dos 3 providers (Asaas/Stripe/
+// Abacatepay) — quando o provider for um que ainda não tem
+// implementação de cobrança avulsa nesse handler, o ServiceCharge fica
+// gravado em status "pending" e devolvemos um aviso pra que o admin
+// emita a cobrança manualmente no painel do provider.
+func (h *AdminBillingHandler) CreateService(c *fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var req struct {
+		Name           string  `json:"name"`
+		Description    string  `json:"description"`
+		Amount         float64 `json:"amount"`
+		Currency       string  `json:"currency"`
+		Category       string  `json:"category"`
+		RecurringCycle string  `json:"recurring_cycle"`
+		SendEmail      bool    `json:"send_email"`
+		Provider       string  `json:"provider"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" || req.Amount <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name e amount > 0 são obrigatórios"})
+	}
+	var user models.User
+	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user não encontrado"})
+	}
+	provider := strings.ToLower(strings.TrimSpace(req.Provider))
+	if provider == "" {
+		provider = resolveUserProvider(&user)
+	}
+	if provider == "" {
+		provider = "asaas" // fallback razoável pra novos users (BR)
+	}
+	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if currency == "" {
+		currency = "BRL"
+	}
+	charge := models.ServiceCharge{
+		UserID:         user.ID,
+		Name:           strings.TrimSpace(req.Name),
+		Description:    strings.TrimSpace(req.Description),
+		Amount:         req.Amount,
+		Currency:       currency,
+		Category:       strings.TrimSpace(req.Category),
+		RecurringCycle: strings.ToUpper(strings.TrimSpace(req.RecurringCycle)),
+		Provider:       provider,
+		Status:         "pending",
+	}
+	if err := h.db.Create(&charge).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Tenta emitir a cobrança no provider escolhido. Stripe e Abacatepay
+	// ficam como TODOs até gente plugar o helper de cobrança one-off de
+	// cada um; o ServiceCharge fica gravado de qualquer jeito (status
+	// "pending") pra que o admin possa cobrar manualmente.
+	emittedURL := ""
+	switch provider {
+	case "asaas":
+		if strings.TrimSpace(user.AsaasCustomerID) == "" {
+			return c.JSON(fiber.Map{
+				"ok":      true,
+				"service": charge,
+				"warning": "User não tem customer Asaas — ServiceCharge salva como pending. Crie o customer primeiro.",
+			})
+		}
+		chargeType := "DETACHED"
+		cycle := ""
+		if charge.RecurringCycle != "" {
+			chargeType = "RECURRENT"
+			cycle = charge.RecurringCycle
+		}
+		coReq := AsaasCheckoutRequest{
+			BillingTypes:      []string{"PIX", "CREDIT_CARD"},
+			ChargeTypes:       []string{chargeType},
+			Customer:          user.AsaasCustomerID,
+			SubscriptionCycle: cycle,
+			Items: []AsaasCheckoutItem{{
+				Name:     charge.Name,
+				Quantity: 1,
+				Value:    charge.Amount,
+				Description: charge.Description,
+			}},
+			ExternalReference: charge.ID.String(),
+		}
+		co, raw, err := h.asaas.CreateAsaasCheckout(coReq)
+		if err != nil || co == nil || co.URL == "" {
+			h.db.Model(&charge).Updates(map[string]any{
+				"status": "failed",
+			})
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+				"error":  "asaas_checkout_failed",
+				"detail": string(raw),
+				"service": charge,
+			})
+		}
+		emittedURL = co.URL
+		h.db.Model(&charge).Updates(map[string]any{
+			"provider_checkout_id": co.ID,
+			"invoice_url":          co.URL,
+			"status":               "sent",
+		})
+	case "stripe":
+		// TODO: criar Stripe Payment Link / one-off Invoice. Por ora
+		// gravamos pending e devolvemos aviso. Próximo PR pluga
+		// stripe.PaymentLink ou stripe.InvoiceItem.
+		return c.JSON(fiber.Map{
+			"ok":      true,
+			"service": charge,
+			"warning": "Provider Stripe ainda sem cobrança one-off automatizada — emita manualmente no Stripe Dashboard pelo customer_id.",
+		})
+	case "abacatepay":
+		// TODO: integrar /v1/checkouts do AbacatePay análogo ao Asaas.
+		return c.JSON(fiber.Map{
+			"ok":      true,
+			"service": charge,
+			"warning": "Provider AbacatePay ainda sem cobrança one-off automatizada — implementação pendente.",
+		})
+	}
+
+	emailed := false
+	if req.SendEmail && emittedURL != "" {
+		subject := "Cobrança: " + charge.Name
+		html := buildCheckoutLinkEmail(user.Name, charge.Name, charge.Amount, emittedURL, charge.Description)
+		if err := h.emailSvc.SyncSend(user.Email, subject, html, "billing_service_charge"); err == nil {
+			emailed = true
+			h.db.Model(&charge).Update("sent_by_email", true)
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"ok":      true,
+		"service": charge,
+		"url":     emittedURL,
+		"emailed": emailed,
+	})
+}
+
+// CancelService POST /v1/admin/users/:id/billing/services/:chargeId/cancel
+// Marca o ServiceCharge como cancelado. Não tenta cancelar no provider
+// (a cobrança one-off normalmente expira sozinha). Use case: cliente
+// desistiu antes de pagar.
+func (h *AdminBillingHandler) CancelService(c *fiber.Ctx) error {
+	chargeID, err := uuid.Parse(c.Params("chargeId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "chargeId inválido"})
+	}
+	now := time.Now()
+	if err := h.db.Model(&models.ServiceCharge{}).
+		Where("id = ?", chargeID).
+		Updates(map[string]any{"status": "canceled", "canceled_at": now}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"ok": true})
+}
