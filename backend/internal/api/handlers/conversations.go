@@ -139,8 +139,8 @@ func (h *ConversationHandler) StartConversation(c *fiber.Ctx) error {
 			})
 			if sendErr != nil {
 				h.db.Model(&logRow).Updates(map[string]any{
-					"status":  models.MessageStatusFailed,
-					"content": string(contentStrBytes) + " /* err: " + truncate(sendErr.Error(), 200) + " */",
+					"status":         models.MessageStatusFailed,
+					"delivery_error": truncate(sendErr.Error(), 500),
 				})
 			} else if res != nil && res.ExternalID != "" {
 				h.db.Model(&logRow).Update("external_message_id", res.ExternalID)
@@ -740,9 +740,11 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	}
 	updates := map[string]any{"status": sendStatus}
 	if sendErrStr != "" {
-		// Append error details into content alongside the original payload so
-		// the agent UI can show why it failed without touching schema.
-		updates["content"] = contentStr + " /* err: " + truncate(sendErrStr, 200) + " */"
+		// MessageLog.delivery_error é o canal certo pra erro — frontend já
+		// renderiza ele como tooltip do tick e como pill abaixo da bolha.
+		// Antes a gente concatenava no content, o que poluía a mensagem
+		// original e ainda dependia do parsing do frontend pra extrair.
+		updates["delivery_error"] = truncate(sendErrStr, 500)
 	}
 	h.db.Model(&logRow).Updates(updates)
 
@@ -1414,7 +1416,10 @@ func (h *ConversationHandler) ForwardMessage(c *fiber.Ctx) error {
 				_, sendErr := h.outbound.Send(ctx, &inst, out)
 				cancel()
 				if sendErr != nil {
-					h.db.Model(&newMsg).Update("status", models.MessageStatusFailed)
+					h.db.Model(&newMsg).Updates(map[string]any{
+						"status":         models.MessageStatusFailed,
+						"delivery_error": truncate(sendErr.Error(), 500),
+					})
 					results = append(results, result{ConversationID: raw, MessageID: newMsg.ID.String(), Error: sendErr.Error()})
 					continue
 				}
