@@ -584,6 +584,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.UsageQuota{},
 		&models.WorkspaceQuota{},
 		&models.UsageTopup{},
+		&models.ServiceCharge{},
 		// Help Desk (knowledge base)
 		&models.HelpDeskCategory{},
 		&models.HelpDeskArticle{},

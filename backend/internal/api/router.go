@@ -1755,6 +1755,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	admin.Post("/users/:id/billing/refund", adminBillingH.RefundPayment)
 	admin.Post("/users/:id/billing/checkout-link", adminBillingH.CreateCheckoutLink)
 	admin.Post("/users/:id/billing/send-link", adminBillingH.SendCheckoutLink)
+	admin.Get("/users/:id/billing/services", adminBillingH.ListServices)
+	admin.Post("/users/:id/billing/services", adminBillingH.CreateService)
+	admin.Post("/users/:id/billing/services/:chargeId/cancel", adminBillingH.CancelService)
 
 	admin.Delete("/users/:id", adminH.DeleteUser)
 	admin.Get("/users/:id/delete-diagnose", adminH.UserDeleteDiagnose)
