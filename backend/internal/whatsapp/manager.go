@@ -1735,9 +1735,25 @@ func (m *Manager) isManagedWhatsAppSender(currentInstanceID, fromJID string) boo
 		return false
 	}
 	currentID, _ := uuid.Parse(currentInstanceID)
+
+	// Resolve workspace da instância atual. O loop-detector existe pra evitar
+	// que mensagem que sai da Instance A do MESMO workspace (e aparece como
+	// inbound em B) dispare automação em B. Sem o filtro de workspace, um
+	// número de tenant alheio que coincide com o do cliente bloqueava o
+	// atendimento — exatamente o sintoma reportado.
+	var current models.Instance
+	if currentID != uuid.Nil {
+		_ = m.db.Select("id, workspace_id").First(&current, "id = ?", currentID).Error
+	}
+	if current.WorkspaceID == nil {
+		return false
+	}
+
 	var instances []models.Instance
 	if err := m.db.Select("id, phone_number").
-		Where("channel IN ? AND phone_number <> ''", []models.ChannelType{models.ChannelWhatsApp, models.ChannelWABA}).
+		Where("channel IN ? AND phone_number <> '' AND workspace_id = ?",
+			[]models.ChannelType{models.ChannelWhatsApp, models.ChannelWABA},
+			*current.WorkspaceID).
 		Find(&instances).Error; err != nil {
 		return false
 	}
@@ -1749,19 +1765,19 @@ func (m *Manager) isManagedWhatsAppSender(currentInstanceID, fromJID string) boo
 		if phone == "" {
 			continue
 		}
-		// Match estrito: ou os números são idênticos, ou um é claramente um
-		// "tail" do outro com pelo menos 10 dígitos em comum (E.164 com DDD
-		// brasileiro tem 12-13 dígitos; suffix de 10 cobre prefixo do país
-		// variável sem falsamente capturar números de clientes que
-		// terminam com poucos dígitos parecidos).
-		const minSuffix = 10
+		// Match estrito: só consideramos loop quando os números são
+		// idênticos depois de removidos não-dígitos. Suffix-match
+		// (mesmo restrito a 10 chars) ainda gerava falso-positivo
+		// quando duas instâncias do mesmo workspace tinham números
+		// próximos ou quando o phone_number ficou cadastrado sem o
+		// country code. Match exato é conservador mas sem ambiguidade.
 		if phone == fromPhone {
+			log.Warn().
+				Str("instance", currentInstanceID).
+				Str("matched_instance", inst.ID.String()).
+				Str("from", fromJID).
+				Msg("automation: inbound bloqueado como loop entre instâncias do mesmo workspace")
 			return true
-		}
-		if len(fromPhone) >= minSuffix && len(phone) >= minSuffix {
-			if strings.HasSuffix(fromPhone, phone) || strings.HasSuffix(phone, fromPhone) {
-				return true
-			}
 		}
 	}
 	return false
