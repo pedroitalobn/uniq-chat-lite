@@ -1744,6 +1744,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// user existente. Faz upgrade/downgrade in-place quando já há sub
 	// ativa (subscription.Update + proration); senão, devolve checkout.
 	admin.Post("/users/:id/billing-link", stripeH.AdminCreateBillingLink)
+
+	// Admin Billing — visão consolidada + ações cirúrgicas sobre o
+	// faturamento de um user (overview, criar fatura avulsa, toggle de
+	// cobranças extras). Frontend: BillingPanelModal em /admin/users.
+	adminBillingH := handlers.NewAdminBillingHandler(db, asaasH)
+	admin.Get("/users/:id/billing/overview", adminBillingH.Overview)
+	admin.Post("/users/:id/billing/custom-invoice", adminBillingH.CreateCustomInvoice)
+	admin.Patch("/users/:id/billing/overage", adminBillingH.ToggleOverage)
+
 	admin.Delete("/users/:id", adminH.DeleteUser)
 	admin.Get("/users/:id/delete-diagnose", adminH.UserDeleteDiagnose)
 	admin.Put("/plans/:id", adminH.UpdatePlan)

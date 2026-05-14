@@ -1806,6 +1806,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			authReq := AsaasPixAutomaticAuthRequest{
 				Customer:          customerID,
 				Value:             plan.Price,
+				Frequency:         "MONTHLY",
 				Cycle:             "MONTHLY",
 				NextDueDate:       time.Now().Format("2006-01-02"),
 				Description:       "Assinatura " + plan.Name + " — Uniq Chat",

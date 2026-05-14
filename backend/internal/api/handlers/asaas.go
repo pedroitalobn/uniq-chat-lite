@@ -577,12 +577,14 @@ func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 // e Asaas debita automático (sem QR novo, sem ação do cliente).
 
 // AsaasPixAutomaticAuthRequest — payload de criação da autorização.
-// Campos derivados do padrão Asaas (subscription + pix). Ajustar se o
-// sandbox indicar divergência (ex: campo extra obrigatório).
+// frequency é obrigatório (Asaas devolve parse_error sem ele); cycle
+// segue como complemento opcional pra ficar compatível com docs antigas
+// onde só cycle aparecia.
 type AsaasPixAutomaticAuthRequest struct {
 	Customer          string  `json:"customer"`
 	Value             float64 `json:"value"`
-	Cycle             string  `json:"cycle"`             // MONTHLY | WEEKLY | etc.
+	Frequency         string  `json:"frequency"`         // OBRIGATÓRIO — MONTHLY | WEEKLY | DAILY etc.
+	Cycle             string  `json:"cycle,omitempty"`   // legacy, mantido por compatibilidade
 	NextDueDate       string  `json:"nextDueDate"`       // YYYY-MM-DD do primeiro charge
 	ExpirationDate    string  `json:"expirationDate,omitempty"`
 	Description       string  `json:"description,omitempty"`
