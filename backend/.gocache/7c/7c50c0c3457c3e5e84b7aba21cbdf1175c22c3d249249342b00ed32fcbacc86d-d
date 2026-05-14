@@ -1,7 +1,0 @@
-./Doc.go
-./IdentityKeyStore.go
-./MessageKeyStore.go
-./PreKeyStore.go
-./SessionStore.go
-./SignalProtocolStore.go
-./SignedPreKeyStore.go

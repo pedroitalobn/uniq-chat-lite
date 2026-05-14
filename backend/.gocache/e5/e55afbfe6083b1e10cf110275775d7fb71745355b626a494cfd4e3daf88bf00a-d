@@ -1,5 +1,0 @@
-./constants.go
-./dialopts.go
-./framesocket.go
-./noisehandshake.go
-./noisesocket.go

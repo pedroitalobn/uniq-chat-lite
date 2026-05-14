@@ -1,7 +1,0 @@
-./auth.go
-./csrf.go
-./feature_gate.go
-./ratelimit.go
-./tenant.go
-./v1_auth.go
-./workspace_perm.go
