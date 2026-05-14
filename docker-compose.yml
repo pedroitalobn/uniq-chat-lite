@@ -1,28 +1,34 @@
+# Dokploy compose — white-label.
+# Toda configuração específica do cliente vem do .env. Defaults sensatos para
+# permitir `docker compose up -d` em dev sem editar nada.
+#
+# Para múltiplas instâncias no mesmo host Dokploy: setar STACK_NAME diferente
+# em cada projeto (default = "uniq"). Os container_name viram ${STACK_NAME}-*
+# e não colidem.
+
 services:
 
-  # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: uniqchat-postgres
+    container_name: ${STACK_NAME:-uniq}-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: uniqchat
+      POSTGRES_USER: ${POSTGRES_USER:-uniqchat}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: uniqchat
+      POSTGRES_DB: ${POSTGRES_DB:-uniqchat}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - dokploy-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uniqchat"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uniqchat}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # ── RabbitMQ ───────────────────────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: uniqchat-rabbitmq
+    container_name: ${STACK_NAME:-uniq}-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-uniqchat}
@@ -30,8 +36,6 @@ services:
       RABBITMQ_DEFAULT_VHOST: /
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-    ports:
-      - "15672:15672"   # Management UI — feche após configurar
     networks:
       - dokploy-network
     healthcheck:
@@ -40,17 +44,11 @@ services:
       timeout: 10s
       retries: 10
 
-  # MinIO local foi REMOVIDO — produção usa Hetzner Object Storage
-  # (gerenciado, S3-compatible). Variáveis MINIO_* no .env apontam pro
-  # endpoint Hetzner. Pra reativar local: descomentar serviço, voltar
-  # depends_on do backend e setar MINIO_ENDPOINT=uniqchat-minio:9000.
-
-  # ── Instagram Bridge ───────────────────────────────────────────────────────
   instagram-bridge:
     build:
       context: ./instagram-bridge
       dockerfile: Dockerfile
-    container_name: uniqchat-instagram-bridge
+    container_name: ${STACK_NAME:-uniq}-instagram-bridge
     restart: unless-stopped
     environment:
       INSTAGRAM_BRIDGE_PORT: 8091
@@ -60,12 +58,11 @@ services:
     networks:
       - dokploy-network
 
-  # ── Backend ────────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: uniqchat-backend
+    container_name: ${STACK_NAME:-uniq}-backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -76,78 +73,75 @@ services:
         condition: service_started
     environment:
       PORT: 8080
-      # Usa container_name como hostname — DNS do dokploy-network resolve por nome do container
-      DATABASE_URL: postgres://uniqchat:${POSTGRES_PASSWORD}@uniqchat-postgres:5432/uniqchat?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-uniqchat}:${POSTGRES_PASSWORD}@${STACK_NAME:-uniq}-postgres:5432/${POSTGRES_DB:-uniqchat}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      FRONTEND_URL: https://app.uniq.chat
-      APP_URL: https://app.uniq.chat
-      APP_NAME: Uniq.chat
+      FRONTEND_URL: ${FRONTEND_URL}
+      APP_URL: ${APP_URL}
+      APP_NAME: ${APP_NAME:-Uniq}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SESSION_DIR: /app/sessions
       PROXY_ENCRYPTION_KEY: ${PROXY_ENCRYPTION_KEY}
-      RESEND_API_KEY: ${RESEND_API_KEY}
-      FROM_EMAIL: ${FROM_EMAIL}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO}
-      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS}
-      RABBITMQ_URI: amqp://${RABBITMQ_USER:-uniqchat}:${RABBITMQ_PASS}@uniqchat-rabbitmq:5672/
-      # ── Storage (Hetzner Object Storage / S3-compatible) ────────────────
-      # Tudo lido do .env — sem hardcode. Aceita também Cloudflare R2,
-      # AWS S3, Backblaze B2, ou MinIO self-hosted.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      RABBITMQ_URI: amqp://${RABBITMQ_USER:-uniqchat}:${RABBITMQ_PASS}@${STACK_NAME:-uniq}-rabbitmq:5672/
+      # Storage S3-compatible (Hetzner / R2 / S3 / MinIO).
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
-      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-${ADMIN_EMAIL}}
-      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-${ADMIN_PASSWORD}}
-      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-${ADMIN_NAME:-Admin}}
-      # White-label bootstrap — aplica migrations do lite + cria admin no boot.
+      # White-label bootstrap.
       BOOTSTRAP_ON_START: ${BOOTSTRAP_ON_START:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_NAME: ${ADMIN_NAME:-Admin}
-      INSTAGRAM_BASE_URL: http://uniqchat-instagram-bridge:8091
-      # ── Meta WhatsApp Cloud API (WABA Tech Provider) ────────────────────
-      META_APP_ID: ${META_APP_ID}
-      META_APP_SECRET: ${META_APP_SECRET}
-      META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID}
-      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN}
+      SUPER_ADMIN_EMAIL: ${ADMIN_EMAIL}
+      SUPER_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SUPER_ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      INSTAGRAM_BASE_URL: http://${STACK_NAME:-uniq}-instagram-bridge:8091
+      # Stripe (opcional — só usado se NEXT_PUBLIC_ENABLE_BILLING=true).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS:-}
+      # Meta WhatsApp Cloud API (opcional).
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID:-}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN:-}
     volumes:
       - sessions_data:/app/sessions
-    ports:
-      - "8181:8080"
+    expose:
+      - "8080"
     networks:
       - dokploy-network
 
-  # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* são build-time no Next.js — obrigatório passar via args
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.uniq.chat}
-        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID}
-        NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID}
-        # White-label feature flags — default oculto.
+        # NEXT_PUBLIC_* são build-time no Next.js.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID:-}
+        NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID:-}
+        # Feature flags do white-label.
         NEXT_PUBLIC_ENABLE_SHOPS: ${NEXT_PUBLIC_ENABLE_SHOPS:-false}
         NEXT_PUBLIC_ENABLE_HELPDESK: ${NEXT_PUBLIC_ENABLE_HELPDESK:-false}
         NEXT_PUBLIC_ENABLE_BILLING: ${NEXT_PUBLIC_ENABLE_BILLING:-false}
         NEXT_PUBLIC_ENABLE_USAGE: ${NEXT_PUBLIC_ENABLE_USAGE:-false}
-    container_name: uniqchat-frontend
+    container_name: ${STACK_NAME:-uniq}-frontend
     restart: unless-stopped
     depends_on:
       - backend
     environment:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: https://app.uniq.chat
-      API_URL: http://uniqchat-backend:8080
-      NEXT_PUBLIC_API_URL: https://api.uniq.chat
+      NEXTAUTH_URL: ${FRONTEND_URL}
+      API_URL: http://${STACK_NAME:-uniq}-backend:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     expose:
       - "3000"
     networks:
@@ -158,10 +152,10 @@ volumes:
   rabbitmq_data:
   sessions_data:
   instagram_sessions:
-  # minio_data removido junto com o serviço local. Se reativar, voltar aqui.
 
-# dokploy-network é a rede externa gerenciada pelo Dokploy/Traefik.
-# Todos os serviços precisam estar nela para se comunicarem via DNS interno.
+# dokploy-network é a rede externa do Dokploy/Traefik. Domínios e SSL são
+# configurados pelo painel do Dokploy apontando para os serviços `frontend`
+# (porta 3000) e `backend` (porta 8080).
 networks:
   dokploy-network:
     external: true
